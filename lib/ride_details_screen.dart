@@ -7,14 +7,16 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class AddRideScreen extends StatefulWidget {
-  const AddRideScreen({super.key});
+class RideDetailsScreen extends StatefulWidget {
+  final LatLng startLocation;
+
+  const RideDetailsScreen({super.key, required this.startLocation});
 
   @override
-  State<AddRideScreen> createState() => _AddRideScreenState();
+  State<RideDetailsScreen> createState() => _RideDetailsScreenState();
 }
 
-class _AddRideScreenState extends State<AddRideScreen> {
+class _RideDetailsScreenState extends State<RideDetailsScreen> {
   final MapController _mapController = MapController();
   LatLng? _pickedLocation;
   List<LatLng> _routePoints = [];
@@ -26,7 +28,6 @@ class _AddRideScreenState extends State<AddRideScreen> {
   DateTime? _selectedDate;
   double _seats = 1;
 
-  // Coordinates for EST Agadir (Destination)
   static const LatLng _estAgadirLocation = LatLng(30.3986, -9.5532);
 
   @override
@@ -69,7 +70,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
         final List<dynamic> coordinates = data['routes'][0]['geometry']['coordinates'];
         setState(() {
           _routePoints = coordinates
-              .map((coord) => LatLng(coord[1], coord[0])) // OSRM returns [lng, lat]
+              .map((coord) => LatLng(coord[1], coord[0]))
               .toList();
         });
       } else {
@@ -164,7 +165,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
 
       if (!mounted) return;
       _showSnackBar('Trajet publié avec succès !', Colors.green);
-      Navigator.of(context).pop(); // Close the screen after publishing
+      Navigator.of(context).pop();
     } on FirebaseException catch (e) {
       _showSnackBar('Erreur Firebase: ${e.message}', Colors.redAccent);
     } catch (e) {
@@ -318,32 +319,61 @@ class _AddRideScreenState extends State<AddRideScreen> {
                       strokeWidth: 5.0,
                     ),
                   ],
+
                 ),
+
             ],
+
           ),
+
           if (_isLoadingMap)
+
             const Center(
+
               child: CircularProgressIndicator(color: Colors.blueAccent),
+
             ),
+
           if (_pickedLocation != null && _routePoints.isNotEmpty)
+
             Positioned(
+
               bottom: 20,
+
               left: 20,
+
               right: 20,
+
               child: ElevatedButton(
+
                 onPressed: _showRideDetailsForm,
+
                 style: ElevatedButton.styleFrom(
+
                   backgroundColor: Colors.green,
+
                   foregroundColor: Colors.white,
+
                   padding: const EdgeInsets.symmetric(vertical: 16),
+
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
                   textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
                 ),
+
                 child: const Text('Confirmer le trajet'),
+
               ),
+
             ),
+
         ],
+
       ),
+
     );
+
   }
+
 }

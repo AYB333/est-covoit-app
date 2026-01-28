@@ -28,7 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      MaterialPageRoute(builder: (context) => LoginScreen()),
       (Route<dynamic> route) => false,
     );
   }
@@ -37,7 +37,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final userName = _getUserName();
     // Default LatLng (Agadir)
-    const LatLng defaultStartLocation = LatLng(30.4000, -9.6000);
+    final LatLng defaultStartLocation = LatLng(30.4000, -9.6000);
 
     return Scaffold(
       appBar: AppBar(
@@ -80,8 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              // HNA L-ISLA7: Hiyydna 'const' bach ma-t-crashich
-                              builder: (context) => const RideDetailsScreen(startLocation: defaultStartLocation),
+                              builder: (context) => RideDetailsScreen(startLocation: defaultStartLocation),
                             ),
                           );
                         },
@@ -97,7 +96,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         color: Colors.green,
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(builder: (context) => const FindRideScreen()),
+                            MaterialPageRoute(builder: (context) => FindRideScreen()),
                           );
                         },
                       ),
