@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:geolocator/geolocator.dart';
 
 class RideDetailsScreen extends StatefulWidget {
   final LatLng startLocation;
@@ -28,7 +29,14 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   DateTime? _selectedDate;
   double _seats = 1;
 
-  static const LatLng _estAgadirLocation = LatLng(30.3986, -9.5532);
+  // Corrected coordinates for EST Agadir (Destination)
+      static const LatLng _estAgadirLocation = LatLng(30.4070, -9.5790);
+
+  @override
+  void initState() {
+    super.initState();
+    // _pickedLocation is initially null, route is drawn only on user interaction
+  }
 
   @override
   void dispose() {
@@ -70,7 +78,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         final List<dynamic> coordinates = data['routes'][0]['geometry']['coordinates'];
         setState(() {
           _routePoints = coordinates
-              .map((coord) => LatLng(coord[1], coord[0]))
+              .map((coord) => LatLng(coord[1], coord[0])) // OSRM returns [lng, lat]
               .toList();
         });
       } else {
@@ -90,6 +98,37 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
       _pickedLocation = latlng;
     });
     _fetchRoute(latlng);
+  }
+
+  Future<void> _goToCurrentLocation() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _showSnackBar('Les permissions de localisation sont refusées.', Colors.redAccent);
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _showSnackBar('Les permissions de localisation sont refusées de manière permanente.', Colors.redAccent);
+      return;
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      LatLng currentLocation = LatLng(position.latitude, position.longitude);
+
+      _mapController.move(currentLocation, 13.0);
+      setState(() {
+        _pickedLocation = currentLocation;
+      });
+      _fetchRoute(currentLocation);
+    } catch (e) {
+      _showSnackBar('Impossible d\'obtenir la position actuelle: ${e.toString()}', Colors.redAccent);
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -178,111 +217,139 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   }
 
   void _showRideDetailsForm() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Confirmer les détails du trajet',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue[800]),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _priceController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Prix (MAD)',
-                  prefixIcon: const Icon(Icons.money),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (BuildContext context) {
+      // StatefulBuilder allows the BottomSheet to rebuild itself
+      return StatefulBuilder(
+        builder: (BuildContext context, StateSetter setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 20,
+              right: 20,
+              top: 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Confirmer les détails du trajet',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue[800]),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: 'Numéro de téléphone',
-                  prefixIcon: const Icon(Icons.phone),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 20),
+                
+                // Prix
+                TextField(
+                  controller: _priceController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Prix (MAD)',
+                    prefixIcon: const Icon(Icons.money),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 15),
-              GestureDetector(
-                onTap: () => _selectDate(context),
-                child: AbsorbPointer(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      labelText: _selectedDate == null
-                          ? 'Date et heure du trajet'
-                          : DateFormat('dd/MM/yyyy HH:mm').format(_selectedDate!),
-                      prefixIcon: const Icon(Icons.calendar_today),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 15),
+                
+                // Téléphone
+                TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Numéro de téléphone',
+                    prefixIcon: const Icon(Icons.phone),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                
+                // Date Picker
+                GestureDetector(
+                  onTap: () async {
+                    await _selectDate(context);
+                    // Update modal to show the new date text
+                    setModalState(() {}); 
+                  },
+                  child: AbsorbPointer(
+                    child: TextField(
+                      decoration: InputDecoration(
+                        labelText: _selectedDate == null
+                            ? 'Date et heure du trajet'
+                            : DateFormat('dd/MM/yyyy HH:mm').format(_selectedDate!),
+                        prefixIcon: const Icon(Icons.calendar_today),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 15),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Nombre de sièges: ${_seats.toInt()}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  Slider(
-                    value: _seats,
-                    min: 1,
-                    max: 5,
-                    divisions: 4,
-                    label: _seats.toInt().toString(),
-                    onChanged: (value) {
-                      setState(() {
-                        _seats = value;
-                      });
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: _isLoadingPublish ? null : _publishRide,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[700],
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                const SizedBox(height: 15),
+                
+                // SLIDER FIX
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Nombre de sièges: ${_seats.toInt()}',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    Slider(
+                      value: _seats,
+                      min: 1,
+                      max: 4, // Reasonable max for a car
+                      divisions: 3,
+                      label: _seats.toInt().toString(),
+                      activeColor: Colors.blue[800],
+                      onChanged: (value) {
+                        // Update BOTH the local modal state and the parent state
+                        setModalState(() => _seats = value);
+                        setState(() => _seats = value);
+                      },
+                    ),
+                  ],
                 ),
-                child: _isLoadingPublish
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Publier le trajet'),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
-  }
+                const SizedBox(height: 20),
+                
+                // Save Button
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context); // Close modal first
+                    _publishRide(); // Then save
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text("Publier le trajet", style: TextStyle(fontSize: 18, color: Colors.white)),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 100.0),
+        child: FloatingActionButton(
+          onPressed: _goToCurrentLocation,
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.blue[700],
+          child: const Icon(Icons.my_location),
+        ),
+      ),
       appBar: AppBar(
         title: const Text('Proposer un trajet'),
         backgroundColor: Colors.blue[700],
@@ -299,17 +366,43 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
             ),
             children: [
               TileLayer(urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
-              if (_pickedLocation != null)
-                MarkerLayer(
-                  markers: [
+              // Always display a marker for EST Agadir destination
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: _estAgadirLocation,
+                    width: 80,
+                    height: 80,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        const Icon(Icons.location_on, color: Colors.blue, size: 40),
+                        Positioned(
+                          bottom: 35,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: const Text(
+                              'ESTA AGADIR',
+                              style: TextStyle(color: Colors.white, fontSize: 10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ), // Destination Marker
+                  ),
+                  if (_pickedLocation != null)
                     Marker(
                       point: _pickedLocation!,
                       width: 80,
                       height: 80,
-                      child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+                      child: const Icon(Icons.location_pin, color: Colors.red, size: 40), // Start Marker (Picked Location)
                     ),
-                  ],
-                ),
+                ],
+              ),
               if (_routePoints.isNotEmpty)
                 PolylineLayer(
                   polylines: [
@@ -319,61 +412,32 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                       strokeWidth: 5.0,
                     ),
                   ],
-
                 ),
-
             ],
-
           ),
-
           if (_isLoadingMap)
-
             const Center(
-
               child: CircularProgressIndicator(color: Colors.blueAccent),
-
             ),
-
           if (_pickedLocation != null && _routePoints.isNotEmpty)
-
             Positioned(
-
               bottom: 20,
-
               left: 20,
-
               right: 20,
-
               child: ElevatedButton(
-
                 onPressed: _showRideDetailsForm,
-
                 style: ElevatedButton.styleFrom(
-
                   backgroundColor: Colors.green,
-
                   foregroundColor: Colors.white,
-
                   padding: const EdgeInsets.symmetric(vertical: 16),
-
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-
                   textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-
                 ),
-
                 child: const Text('Confirmer le trajet'),
-
               ),
-
             ),
-
         ],
-
       ),
-
     );
-
   }
-
 }

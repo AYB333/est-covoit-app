@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:est_covoit/login_screen.dart'; // T2kked mn l-import dyal Login
-import 'package:est_covoit/ride_details_screen.dart';
-import 'package:est_covoit/find_ride_screen.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart'; 
+import 'login_screen.dart';
+import 'ride_details_screen.dart'; // Import dyal Conducteur
+import 'find_ride_screen.dart';   // Import dyal Passager
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -13,12 +13,14 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  // Fonction bach njibou smiya d l-utilisateur
   String _getUserName() {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null && user.displayName != null && user.displayName!.isNotEmpty) {
       return user.displayName!;
     } else if (user != null && user.email != null) {
       String name = user.email!.split('@')[0];
+      // N-kbbrou l-7rf l-lowel
       return name[0].toUpperCase() + name.substring(1);
     }
     return "Utilisateur";
@@ -28,7 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => LoginScreen()),
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
       (Route<dynamic> route) => false,
     );
   }
@@ -36,49 +38,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final userName = _getUserName();
-    // Default LatLng (Agadir)
-    final LatLng defaultStartLocation = LatLng(30.4000, -9.6000);
+    final LatLng defaultStartLocation = LatLng(30.4000, -9.6000); // Agadir
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('EST-Covoit'),
-        centerTitle: true,
-        backgroundColor: Colors.blue[700],
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _logout,
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bonjour, $userName !',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue[900],
+      backgroundColor: Colors.grey[50], // Arrière-plan khfif
+      appBar: null,
+      body: Column(
+        children: [
+          SafeArea(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.blue[800],
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
                 ),
               ),
-              const SizedBox(height: 30),
-              Expanded(
-                child: Column(
-                  children: [
-                    // CARTE CONDUCTEUR
+              padding: const EdgeInsets.all(25),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Bonjour,", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w300)),
+                      Text(
+                        userName,
+                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.logout, color: Colors.white),
+                    ),
+                    onPressed: _logout,
+                    tooltip: "Se déconnecter",
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                    // --- CARTE CONDUCTEUR ---
                     Expanded(
                       child: _buildRoleCard(
+                        context,
+                        title: "Je suis Conducteur",
+                        subtitle: "Publier un trajet, partager les frais.",
                         icon: Icons.directions_car,
-                        title: 'Mode Conducteur',
-                        subtitle: 'Je propose un trajet',
-                        color: Colors.blue,
+                        color: Colors.blue[800]!,
                         onTap: () {
-                          Navigator.of(context).push(
+                          Navigator.push(
+                            context,
                             MaterialPageRoute(
                               builder: (context) => RideDetailsScreen(startLocation: defaultStartLocation),
                             ),
@@ -87,73 +110,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    // CARTE PASSAGER
+                    
+                    // --- CARTE PASSAGER ---
                     Expanded(
                       child: _buildRoleCard(
-                        icon: Icons.person_search,
-                        title: 'Mode Passager',
-                        subtitle: 'Je cherche un trajet',
-                        color: Colors.green,
+                        context,
+                        title: "Je suis Passager",
+                        subtitle: "Trouver un trajet vers l'EST.",
+                        icon: Icons.search,
+                        color: Colors.green[600]!,
                         onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (context) => FindRideScreen()),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const FindRideScreen()),
                           );
                         },
                       ),
                     ),
-                  ],
-                ),
+                    const SizedBox(height: 20),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildRoleCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      elevation: 5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      // HNA L-ISLA7: shade50 -> withOpacity(0.1)
-      color: color.withOpacity(0.1), 
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(15),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 60, color: color),
-              const SizedBox(height: 15),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  // HNA L-ISLA7: shade800 -> color
-                  color: color, 
-                ),
+  // Design dyal Carte (NADI)
+  Widget _buildRoleCard(BuildContext context, {required String title, required String subtitle, required IconData icon, required Color color, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white, // Abyad bach yban nqi
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            )
+          ],
+          border: Border.all(color: color.withOpacity(0.1), width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1), // Couleur khfifaoura l-icon
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 5),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  // HNA L-ISLA7: shade600 -> withOpacity(0.7)
-                  color: color.withOpacity(0.7), 
-                ),
+              child: Icon(icon, size: 40, color: color),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+                  const SizedBox(height: 5),
+                  Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                ],
               ),
-            ],
-          ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: Colors.grey[300], size: 18),
+          ],
         ),
       ),
     );

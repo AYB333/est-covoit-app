@@ -1,37 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:est_covoit/ride_map_viewer.dart'; // Import the new map viewer screen
 
 class FindRideScreen extends StatelessWidget {
   const FindRideScreen({super.key});
-
-  Future<void> _launchWhatsApp(BuildContext context, String? phoneNumber) async {
-    if (phoneNumber == null || phoneNumber.isEmpty) {
-      _showSnackBar(context, "Numéro de téléphone introuvable", Colors.red);
-      return;
-    }
-
-    String formattedPhoneNumber = phoneNumber.trim();
-    if (formattedPhoneNumber.startsWith('0')) {
-      formattedPhoneNumber = '+212${formattedPhoneNumber.substring(1)}';
-    } else if (!formattedPhoneNumber.startsWith('+')) {
-      formattedPhoneNumber = '+212$formattedPhoneNumber';
-    }
-
-    final Uri url = Uri.parse('https://wa.me/$formattedPhoneNumber');
-    
-    try {
-      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-        throw 'Impossible de lancer WhatsApp';
-      }
-    } catch (e) {
-      print("Erreur WhatsApp: $e");
-      _showSnackBar(context, 'Erreur: WhatsApp n\'est pas installé ou lien invalide', Colors.redAccent);
-    }
-  }
 
   void _showSnackBar(BuildContext context, String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -54,7 +28,12 @@ class FindRideScreen extends StatelessWidget {
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('rides').orderBy('date', descending: false).snapshots(),
+        // Filter rides where the 'date' field is greater than or equal to the current date/time
+        stream: FirebaseFirestore.instance
+            .collection('rides')
+            .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now().subtract(const Duration(hours: 2))))
+            .orderBy('date', descending: false)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -100,8 +79,8 @@ class FindRideScreen extends StatelessWidget {
               double startLat = (data['startLat'] as num?)?.toDouble() ?? 0.0;
               double startLng = (data['startLng'] as num?)?.toDouble() ?? 0.0;
               String? phone = data['phone']?.toString();
+              DateTime rideDate = (data['date'] as Timestamp).toDate();
               
-              // Hna l-code kay-jbed l-points d l-map wakha ma-kysta3mlhoumch daba (Mzyan)
               List<LatLng> polylinePoints = [];
               if (data['polylinePoints'] != null) {
                 polylinePoints = (data['polylinePoints'] as List<dynamic>)
@@ -115,14 +94,23 @@ class FindRideScreen extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 child: InkWell(
                   onTap: () {
-                    // Mba3d n-qddo ndiro navigation hna bach y-chouf l-Map
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => RideMapViewer(
+                          polylinePoints: polylinePoints,
+                          driverName: driverName,
+                          phone: phone,
+                          price: price,
+                          date: rideDate,
+                        ),
+                      ),
+                    );
                   },
                   child: Padding(
                     padding: const EdgeInsets.all(15.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -139,27 +127,17 @@ class FindRideScreen extends StatelessWidget {
                         ),
                         const Divider(height: 20),
                         
-                        // Détails
-                        _buildDetailRow(Icons.location_on, 'De: ${startLat.toStringAsFixed(4)}, ${startLng.toStringAsFixed(4)}'),
+                        _buildDetailRow(Icons.location_on, 'De: Point de départ'),
                         _buildDetailRow(Icons.location_city, 'À: $destinationName'),
                         _buildDetailRow(Icons.calendar_today, 'Date: $formattedDate'),
                         _buildDetailRow(Icons.event_seat, 'Sièges disponibles: $seats'),
 
                         const SizedBox(height: 15),
-                        
-                        // Bouton WhatsApp (CORRIGÉ)
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () => _launchWhatsApp(context, phone),
-                            // HNA FIN KAN L-GHLAT: Rddina Icons.whatsapp -> Icons.message
-                            icon: const Icon(Icons.message, color: Colors.white), 
-                            label: const Text('Contacter sur WhatsApp', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            '📍 Voir le trajet sur la carte',
+                            style: TextStyle(color: Colors.blue[600], fontSize: 14, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],
