@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:est_covoit/ride_map_viewer.dart'; // Import the new map viewer screen
 
 class FindRideScreen extends StatelessWidget {
@@ -54,7 +55,8 @@ class FindRideScreen extends StatelessWidget {
             );
           }
 
-          final rides = snapshot.data!.docs;
+              final rides = snapshot.data!.docs;
+              final currentUserUid = FirebaseAuth.instance.currentUser?.uid; // Get current user UID
 
           return ListView.builder(
             padding: const EdgeInsets.all(16.0),
@@ -108,37 +110,80 @@ class FindRideScreen extends StatelessWidget {
                   },
                   child: Padding(
                     padding: const EdgeInsets.all(15.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Stack(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Conducteur: $driverName',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Conducteur: $driverName',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                                ),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(10)),
+                                      child: Text('$price MAD', style: TextStyle(color: Colors.green[800], fontWeight: FontWeight.bold)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    if (currentUserUid == data['driverId'])
+                                      IconButton(
+                                        icon: const Icon(Icons.delete, color: Colors.red),
+                                        onPressed: () async {
+                                          final bool? confirmDelete = await showDialog<bool>(
+                                            context: context,
+                                            builder: (BuildContext dialogContext) {
+                                              return AlertDialog(
+                                                title: const Text('Supprimer le trajet ?'),
+                                                content: const Text('Voulez-vous vraiment supprimer ce trajet ?'),
+                                                actions: <Widget>[
+                                                  TextButton(
+                                                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                                                    child: const Text('Annuler'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                                                    child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+
+                                          if (confirmDelete == true) {
+                                            try {
+                                              await FirebaseFirestore.instance.collection('rides').doc(ride.id).delete();
+                                              _showSnackBar(context, 'Trajet supprimé avec succès !', Colors.green);
+                                            } catch (e) {
+                                              _showSnackBar(context, 'Erreur lors de la suppression: ${e.toString()}', Colors.redAccent);
+                                            }
+                                          }
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              ],
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(10)),
-                              child: Text('$price MAD', style: TextStyle(color: Colors.green[800], fontWeight: FontWeight.bold)),
+                            const Divider(height: 20),
+                            
+                            _buildDetailRow(Icons.location_on, 'De: Point de départ'),
+                            _buildDetailRow(Icons.location_city, 'À: $destinationName'),
+                            _buildDetailRow(Icons.calendar_today, 'Date: $formattedDate'),
+                            _buildDetailRow(Icons.event_seat, 'Sièges disponibles: $seats'),
+
+                            const SizedBox(height: 15),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                '📍 Voir le trajet sur la carte',
+                                style: TextStyle(color: Colors.blue[600], fontSize: 14, fontWeight: FontWeight.w600),
+                              ),
                             ),
                           ],
-                        ),
-                        const Divider(height: 20),
-                        
-                        _buildDetailRow(Icons.location_on, 'De: Point de départ'),
-                        _buildDetailRow(Icons.location_city, 'À: $destinationName'),
-                        _buildDetailRow(Icons.calendar_today, 'Date: $formattedDate'),
-                        _buildDetailRow(Icons.event_seat, 'Sièges disponibles: $seats'),
-
-                        const SizedBox(height: 15),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            '📍 Voir le trajet sur la carte',
-                            style: TextStyle(color: Colors.blue[600], fontSize: 14, fontWeight: FontWeight.w600),
-                          ),
                         ),
                       ],
                     ),
