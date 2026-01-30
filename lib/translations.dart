@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'language_service.dart';
 
 class Translations {
   static const Map<String, Map<String, String>> _translations = {
@@ -93,8 +95,13 @@ class Translations {
   }
 
   static String _getLanguageCode(BuildContext context) {
-    final locale = Localizations.localeOf(context);
-    return locale.languageCode;
+    try {
+      final languageService = context.watch<LanguageService>();
+      return languageService.currentLanguage;
+    } catch (e) {
+      // Fallback if provider is not available
+      return 'fr';
+    }
   }
 
   static List<String> getSupportedLanguages() {
