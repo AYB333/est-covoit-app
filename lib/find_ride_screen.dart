@@ -16,7 +16,6 @@ class FindRideScreen extends StatefulWidget {
 }
 
 class _FindRideScreenState extends State<FindRideScreen> {
-
   void _showSnackBar(BuildContext context, String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -78,20 +77,13 @@ class _FindRideScreenState extends State<FindRideScreen> {
 
           final allRides = snapshot.data!.docs;
 
-          // Filter rides by distance < 3000 meters from pickup location
+          // Simple filter: Show all active trips going to EST Agadir
           final filteredRides = allRides.where((ride) {
             final data = ride.data() as Map<String, dynamic>;
-            final double startLat = (data['startLat'] as num?)?.toDouble() ?? 0.0;
-            final double startLng = (data['startLng'] as num?)?.toDouble() ?? 0.0;
-
-            final double distanceMeters = Geolocator.distanceBetween(
-              userLat,
-              userLng,
-              startLat,
-              startLng,
-            );
-
-            return distanceMeters < 8000; // 8 km
+            final String destination = (data['destinationName'] ?? '').toString().toLowerCase();
+            
+            // Accept trips that have "agadir" or "est" in the destination
+            return destination.contains('agadir') || destination.contains('est');
           }).toList();
 
           if (filteredRides.isEmpty) {
@@ -101,7 +93,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                 children: [
                   Icon(Icons.directions_car_outlined, size: 60, color: Colors.grey),
                   SizedBox(height: 10),
-                  Text('Aucun trajet à moins de 3 km.', style: TextStyle(color: Colors.grey)),
+                  Text('Aucun trajet vers EST Agadir pour le moment.', style: TextStyle(color: Colors.grey)),
                 ],
               ),
             );
@@ -127,6 +119,9 @@ class _FindRideScreenState extends State<FindRideScreen> {
 
               String driverName = data['driverName']?.toString() ?? "Inconnu";
               String destinationName = data['destinationName']?.toString() ?? "EST Agadir";
+              // Get departure address with fallback to coordinates
+              String departureCity = data['departureAddress']?.toString() ?? 
+                  "${(data['startLat'] as num?)?.toStringAsFixed(2) ?? '?'}, ${(data['startLng'] as num?)?.toStringAsFixed(2) ?? '?'}";
               String price = data['price']?.toString() ?? "?";
               String seats = data['seats']?.toString() ?? "0";
               String? phone = data['phone']?.toString();
@@ -219,8 +214,56 @@ class _FindRideScreenState extends State<FindRideScreen> {
                             ),
                             const Divider(height: 20),
                             
-                            _buildDetailRow(Icons.location_on, 'De: Point de départ'),
-                            _buildDetailRow(Icons.location_city, 'À: $destinationName'),
+                            // Prominent route display
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.blue[200]!, width: 1),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'De:',
+                                          style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.w500),
+                                        ),
+                                        Text(
+                                          departureCity,
+                                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(Icons.arrow_forward, color: Colors.blue[600]),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          'À:',
+                                          style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.w500),
+                                        ),
+                                        Text(
+                                          destinationName,
+                                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            
                             _buildDetailRow(Icons.calendar_today, 'Date: $formattedDate'),
                             _buildDetailRow(Icons.event_seat, 'Sièges disponibles: $seats'),
 

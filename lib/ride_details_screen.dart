@@ -7,6 +7,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 class RideDetailsScreen extends StatefulWidget {
   final LatLng startLocation;
@@ -20,12 +21,14 @@ class RideDetailsScreen extends StatefulWidget {
 class _RideDetailsScreenState extends State<RideDetailsScreen> {
   final MapController _mapController = MapController();
   LatLng? _pickedLocation;
+  String? _departureAddress; // New field for departure address
   List<LatLng> _routePoints = [];
   bool _isLoadingMap = false;
   bool _isLoadingPublish = false;
 
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _departureAddressController = TextEditingController();
   DateTime? _selectedDate;
   double _seats = 1;
 
@@ -42,6 +45,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   void dispose() {
     _priceController.dispose();
     _phoneController.dispose();
+    _departureAddressController.dispose();
     super.dispose();
   }
 
@@ -56,6 +60,87 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
           borderRadius: BorderRadius.circular(10),
         ),
       ),
+    );
+  }
+
+  /// Geocode the picked location to get the address
+  /// If successful, return the formatted address
+  /// If failed, prompt user to enter manual address
+  Future<void> _geocodeLocation(LatLng location) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        location.latitude,
+        location.longitude,
+      );
+      
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks.first;
+        // Build address from available fields
+        final String address = [
+          place.locality,
+          place.administrativeArea,
+          place.country,
+        ].where((e) => e != null && e.isNotEmpty).join(', ');
+        
+        if (address.isNotEmpty) {
+          setState(() {
+            _departureAddress = address;
+            _departureAddressController.text = address;
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      print('Geocoding error: $e');
+    }
+    
+    // If geocoding fails, prompt for manual entry
+    _showManualAddressDialog();
+  }
+
+  void _showManualAddressDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Entrer le nom du lieu'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Impossible de détecter automatiquement l\'adresse. Veuillez entrer un nom pour ce lieu (ex: "Dcheira", "Près de la Mosquée")'),
+              const SizedBox(height: 15),
+              TextField(
+                controller: _departureAddressController,
+                decoration: InputDecoration(
+                  labelText: 'Nom du lieu',
+                  hintText: 'ex: Dcheira, Agadir Bay',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final String customAddress = _departureAddressController.text.trim();
+                if (customAddress.isNotEmpty) {
+                  setState(() {
+                    _departureAddress = customAddress;
+                  });
+                  Navigator.pop(context);
+                } else {
+                  _showSnackBar('Veuillez entrer un nom', Colors.redAccent);
+                }
+              },
+              child: const Text('Valider'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -98,6 +183,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
       _pickedLocation = latlng;
     });
     _fetchRoute(latlng);
+    _geocodeLocation(latlng); // Get address for the picked location
   }
 
   Future<void> _goToCurrentLocation() async {
@@ -126,6 +212,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         _pickedLocation = currentLocation;
       });
       _fetchRoute(currentLocation);
+      _geocodeLocation(currentLocation); // Get address for current location
     } catch (e) {
       _showSnackBar('Impossible d\'obtenir la position actuelle: ${e.toString()}', Colors.redAccent);
     }
@@ -162,8 +249,9 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         _phoneController.text.isEmpty ||
         _selectedDate == null ||
         _pickedLocation == null ||
-        _routePoints.isEmpty) {
-      _showSnackBar('Veuillez sélectionner un point de départ et remplir tous les champs.', Colors.redAccent);
+        _routePoints.isEmpty ||
+        _departureAddress == null || _departureAddress!.isEmpty) {
+      _showSnackBar('Veuillez sélectionner un point de départ avec une adresse et remplir tous les champs.', Colors.redAccent);
       return;
     }
 
@@ -194,6 +282,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         'date': Timestamp.fromDate(_selectedDate!),
         'startLat': _pickedLocation!.latitude,
         'startLng': _pickedLocation!.longitude,
+        'departureAddress': _departureAddress, // New field for address
         'destinationLat': _estAgadirLocation.latitude,
         'destinationLng': _estAgadirLocation.longitude,
         'destinationName': 'EST Agadir',
