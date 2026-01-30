@@ -2,11 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
-import 'package:est_covoit/ride_map_viewer.dart'; // Import the new map viewer screen
+import 'package:geolocator/geolocator.dart';
+import 'ride_map_viewer.dart'; // Import the new map viewer screen
+import 'package:firebase_auth/firebase_auth.dart';
 
-class FindRideScreen extends StatelessWidget {
-  const FindRideScreen({super.key});
+class FindRideScreen extends StatefulWidget {
+  final LatLng? userPickupLocation;
+
+  const FindRideScreen({super.key, this.userPickupLocation});
+
+  @override
+  State<FindRideScreen> createState() => _FindRideScreenState();
+}
+
+class _FindRideScreenState extends State<FindRideScreen> {
 
   void _showSnackBar(BuildContext context, String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -22,6 +31,18 @@ class FindRideScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final LatLng? pickup = widget.userPickupLocation;
+
+    if (pickup == null) {
+      return  Scaffold(
+        appBar: AppBar(title: Text('Trajets Disponibles')),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final double userLat = pickup.latitude;
+    final double userLng = pickup.longitude;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Trajets Disponibles'),
@@ -55,14 +76,44 @@ class FindRideScreen extends StatelessWidget {
             );
           }
 
-              final rides = snapshot.data!.docs;
-              final currentUserUid = FirebaseAuth.instance.currentUser?.uid; // Get current user UID
+          final allRides = snapshot.data!.docs;
+
+          // Filter rides by distance < 3000 meters from pickup location
+          final filteredRides = allRides.where((ride) {
+            final data = ride.data() as Map<String, dynamic>;
+            final double startLat = (data['startLat'] as num?)?.toDouble() ?? 0.0;
+            final double startLng = (data['startLng'] as num?)?.toDouble() ?? 0.0;
+
+            final double distanceMeters = Geolocator.distanceBetween(
+              userLat,
+              userLng,
+              startLat,
+              startLng,
+            );
+
+            return distanceMeters < 8000; // 8 km
+          }).toList();
+
+          if (filteredRides.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.directions_car_outlined, size: 60, color: Colors.grey),
+                  SizedBox(height: 10),
+                  Text('Aucun trajet à moins de 3 km.', style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            );
+          }
+
+          final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
 
           return ListView.builder(
             padding: const EdgeInsets.all(16.0),
-            itemCount: rides.length,
+            itemCount: filteredRides.length,
             itemBuilder: (context, index) {
-              final ride = rides[index];
+              final ride = filteredRides[index];
               final data = ride.data() as Map<String, dynamic>;
 
               String formattedDate = "Date inconnue";
@@ -78,15 +129,13 @@ class FindRideScreen extends StatelessWidget {
               String destinationName = data['destinationName']?.toString() ?? "EST Agadir";
               String price = data['price']?.toString() ?? "?";
               String seats = data['seats']?.toString() ?? "0";
-              double startLat = (data['startLat'] as num?)?.toDouble() ?? 0.0;
-              double startLng = (data['startLng'] as num?)?.toDouble() ?? 0.0;
               String? phone = data['phone']?.toString();
               DateTime rideDate = (data['date'] as Timestamp).toDate();
               
               List<LatLng> polylinePoints = [];
               if (data['polylinePoints'] != null) {
                 polylinePoints = (data['polylinePoints'] as List<dynamic>)
-                    .map((p) => LatLng(p['latitude'] as double, p['longitude'] as double))
+                    .map((p) => LatLng((p['latitude'] as num).toDouble(), (p['longitude'] as num).toDouble()))
                     .toList();
               }
 

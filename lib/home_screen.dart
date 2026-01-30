@@ -3,7 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:latlong2/latlong.dart'; 
 import 'login_screen.dart';
 import 'ride_details_screen.dart'; // Import dyal Conducteur
-import 'find_ride_screen.dart';   // Import dyal Passager
+import 'add_ride_screen.dart';    // Import pour map selection
+import 'settings_screen.dart';
+import 'translations.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -35,13 +37,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _showLogoutConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(Translations.getText(context, 'logout')),
+          content: Text(Translations.getText(context, 'logout_confirm')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(Translations.getText(context, 'cancel_btn')),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _logout();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: Text(Translations.getText(context, 'logout_btn'), style: const TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final userName = _getUserName();
     final LatLng defaultStartLocation = LatLng(30.4000, -9.6000); // Agadir
 
     return Scaffold(
-      backgroundColor: Colors.grey[50], // Arrière-plan khfif
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: null,
       body: Column(
         children: [
@@ -61,24 +89,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("Bonjour,", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w300)),
+                      Text(Translations.getText(context, 'home_title'), style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w300)),
                       Text(
                         userName,
                         style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                     ],
                   ),
-                  IconButton(
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.settings, color: Colors.white),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                          ).then((_) => setState(() {})); // Refresh name when returning
+                        },
+                        tooltip: "Paramètres",
                       ),
-                      child: const Icon(Icons.logout, color: Colors.white),
-                    ),
-                    onPressed: _logout,
-                    tooltip: "Se déconnecter",
+                      IconButton(
+                        icon: const Icon(Icons.logout, color: Colors.red),
+                        onPressed: _showLogoutConfirmation,
+                        tooltip: "Déconnexion",
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -95,8 +130,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _buildRoleCard(
                         context,
-                        title: "Je suis Conducteur",
-                        subtitle: "Publier un trajet, partager les frais.",
+                        title: Translations.getText(context, 'driver_card'),
+                        subtitle: Translations.getText(context, 'driver_subtitle'),
                         icon: Icons.directions_car,
                         color: Colors.blue[800]!,
                         onTap: () {
@@ -115,14 +150,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _buildRoleCard(
                         context,
-                        title: "Je suis Passager",
-                        subtitle: "Trouver un trajet vers l'EST.",
+                        title: Translations.getText(context, 'passenger_card'),
+                        subtitle: Translations.getText(context, 'passenger_subtitle'),
                         icon: Icons.search,
                         color: Colors.green[600]!,
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const FindRideScreen()),
+                            MaterialPageRoute(builder: (context) => const AddRideScreen(isDriver: false)),
                           );
                         },
                       ),
@@ -139,13 +174,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Design dyal Carte (NADI)
   Widget _buildRoleCard(BuildContext context, {required String title, required String subtitle, required IconData icon, required Color color, required VoidCallback onTap}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDarkMode ? Theme.of(context).cardColor : Colors.white;
+    final subtitleColor = isDarkMode ? Colors.grey[400] : Colors.grey;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white, // Abyad bach yban nqi
+          color: cardColor,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -174,11 +213,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
                   const SizedBox(height: 5),
-                  Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                  Text(subtitle, style: TextStyle(color: subtitleColor, fontSize: 13)),
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, color: Colors.grey[300], size: 18),
+            Icon(Icons.arrow_forward_ios, color: isDarkMode ? Colors.grey[600] : Colors.grey[300], size: 18),
           ],
         ),
       ),

@@ -317,7 +317,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                 
                 // Save Button
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: _isLoadingPublish ? null : () {
                     Navigator.pop(context); // Close modal first
                     _publishRide(); // Then save
                   },
@@ -326,7 +326,9 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text("Publier le trajet", style: TextStyle(fontSize: 18, color: Colors.white)),
+                  child: _isLoadingPublish
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text("Publier le trajet", style: TextStyle(fontSize: 18, color: Colors.white)),
                 ),
                 const SizedBox(height: 20),
               ],

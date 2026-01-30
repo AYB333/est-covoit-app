@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'login_screen.dart';
-import 'package:est_covoit/home_screen.dart'; // This is now DashboardScreen
+import 'theme_service.dart';
+import 'language_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(const EstCovoitApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeService()),
+        ChangeNotifierProvider(create: (_) => LanguageService()),
+      ],
+      child: const EstCovoitApp(),
+    ),
+  );
 }
 
 class EstCovoitApp extends StatelessWidget {
@@ -15,15 +25,28 @@ class EstCovoitApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'EST-Covoit',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.white,
-        useMaterial3: true,
-      ),
-      home: const LoginScreen(),
+    return Consumer2<ThemeService, LanguageService>(
+      builder: (context, themeService, languageService, _) {
+        return MaterialApp(
+          title: 'EST-Covoit',
+          debugShowCheckedModeBanner: false,
+          theme: themeService.getLightTheme(),
+          darkTheme: themeService.getDarkTheme(),
+          themeMode: themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          locale: languageService.getLocale(),
+          supportedLocales: const [
+            Locale('fr'),
+            Locale('en'),
+            Locale('ar'),
+          ],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: const LoginScreen(),
+        );
+      },
     );
   }
 }
