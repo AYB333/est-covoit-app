@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'user_avatar.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -14,12 +18,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  File? _selectedImage;
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+      });
+    }
+  }
 
   Future<void> _signUp() async {
     if (_nameController.text.isEmpty || 
         _emailController.text.isEmpty || 
         _passwordController.text.isEmpty) {
       _showError("Veuillez remplir tous les champs.");
+      return;
+    }
+
+    if (!_emailController.text.trim().endsWith("@edu.uiz.ac.ma")) {
+      _showError("Veuillez utiliser votre email académique (@edu.uiz.ac.ma).");
       return;
     }
 
@@ -32,8 +52,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
         password: _passwordController.text.trim(),
       );
 
-      // 2. SAUVEGARDER S-SMIYA (Update Profile) <-- Hna fin kyn s-ser
-      await userCredential.user?.updateDisplayName(_nameController.text.trim());
+      // 2. Upload Image if selected
+      String? photoUrl;
+      if (_selectedImage != null) {
+        try {
+          final ref = FirebaseStorage.instance
+              .ref()
+              .child('profile_images/${userCredential.user!.uid}.jpg');
+          
+          final metadata = SettableMetadata(contentType: 'image/jpeg');
+          final uploadTask = ref.putFile(_selectedImage!, metadata);
+          
+          final snapshot = await uploadTask.whenComplete(() => null);
+
+          if (snapshot.state == TaskState.success) {
+             // Delay to ensure consistency
+             await Future.delayed(const Duration(milliseconds: 500));
+             photoUrl = await snapshot.ref.getDownloadURL();
+          }
+        } catch (e) {
+          debugPrint("Erreur upload image au signup: $e");
+          // On continue même si l'image échoue pour ne pas bloquer l'inscription
+        }
+      }
+
+      // 3. SAUVEGARDER S-SMIYA & PHOTO (Update Profile)
+      await userCredential.user?.updateProfile(
+        displayName: _nameController.text.trim(),
+        photoURL: photoUrl
+      );
       await userCredential.user?.reload(); // Bach t-validé dghya
 
       // 3. Afficher Message Vert u Rje3 l Login
@@ -95,7 +142,45 @@ class _SignUpScreenState extends State<SignUpScreen> {
           padding: const EdgeInsets.all(24.0),
           child: Column(
             children: [
-              const Icon(Icons.person_add_alt_1, size: 80, color: Colors.blue),
+              // Dynamic Avatar Preview
+              AnimatedBuilder(
+                animation: _nameController,
+                builder: (context, _) {
+                  return GestureDetector(
+                    onTap: _pickImage,
+                    child: Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        _selectedImage != null
+                          ? CircleAvatar(
+                              radius: 50,
+                              backgroundImage: FileImage(_selectedImage!),
+                              backgroundColor: Colors.grey[200],
+                            )
+                          : UserAvatar(
+                              userName: _nameController.text.isEmpty ? "Nouveau" : _nameController.text,
+                              radius: 50,
+                              backgroundColor: Colors.blue[50],
+                              textColor: Colors.blue,
+                              fontSize: 40,
+                            ),
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.blue,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _selectedImage == null ? Icons.add : Icons.edit, 
+                            color: Colors.white, 
+                            size: 20
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 30),
               
               // Champs Full Name

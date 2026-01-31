@@ -150,9 +150,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
               initialCenter: _selectedLocation,
               initialZoom: 15.0,
               onPositionChanged: (pos, hasGesture) {
-                if (hasGesture) {
-                  setState(() => _selectedLocation = pos.center);
-                }
+                // Removed to prevent marker from moving while dragging
               },
               onTap: _handleMapTap,
             ),

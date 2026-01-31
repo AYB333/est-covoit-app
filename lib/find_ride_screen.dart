@@ -3,8 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import 'ride_map_viewer.dart'; // Import the new map viewer screen
+import 'ride_map_viewer.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'user_avatar.dart';
+import 'translations.dart';
+
 
 class FindRideScreen extends StatefulWidget {
   final LatLng? userPickupLocation;
@@ -34,7 +37,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
 
     if (pickup == null) {
       return  Scaffold(
-        appBar: AppBar(title: Text('Trajets Disponibles')),
+        appBar: AppBar(title: Text(Translations.getText(context, 'available_trips'))),
         body: Center(child: CircularProgressIndicator()),
       );
     }
@@ -44,7 +47,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Trajets Disponibles'),
+        title: Text(Translations.getText(context, 'available_trips')),
         backgroundColor: Colors.blue[700],
         foregroundColor: Colors.white,
       ),
@@ -63,242 +66,395 @@ class _FindRideScreenState extends State<FindRideScreen> {
             return Center(child: Text('Erreur: ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.directions_car_outlined, size: 60, color: Colors.grey),
-                  SizedBox(height: 10),
-                  Text('Aucun trajet disponible pour le moment.', style: TextStyle(color: Colors.grey)),
+                  const Icon(Icons.directions_car_outlined, size: 60, color: Colors.grey),
+                  const SizedBox(height: 10),
+                  Text(Translations.getText(context, 'no_trips'), style: const TextStyle(color: Colors.grey)),
                 ],
               ),
             );
           }
 
           final allRides = snapshot.data!.docs;
+          final Distance distanceCalculator = const Distance();
 
-          // Simple filter: Show all active trips going to EST Agadir
+          // Filter rides that pass near the user (within 3 km radius)
           final filteredRides = allRides.where((ride) {
             final data = ride.data() as Map<String, dynamic>;
-            final String destination = (data['destinationName'] ?? '').toString().toLowerCase();
             
-            // Accept trips that have "agadir" or "est" in the destination
-            return destination.contains('agadir') || destination.contains('est');
+            // 1. Check if potential route points exist
+            List<dynamic> rawPoints = data['polylinePoints'] ?? [];
+            if (rawPoints.isEmpty) {
+              // Fallback: Check start location distance if no route data
+              double startLat = (data['startLat'] as num?)?.toDouble() ?? 0.0;
+              double startLng = (data['startLng'] as num?)?.toDouble() ?? 0.0;
+              if (startLat != 0 && startLng != 0) {
+                 return distanceCalculator.as(LengthUnit.Meter, pickup, LatLng(startLat, startLng)) < 800;
+              }
+              return false;
+            }
+
+            // 2. Check if ANY point on the route is close to user
+            // Optimization: radius reduced to 800m for better accuracy
+            for (var p in rawPoints) {
+              final double lat = (p['latitude'] as num).toDouble();
+              final double lng = (p['longitude'] as num).toDouble();
+              final double distInfo = distanceCalculator.as(LengthUnit.Meter, pickup, LatLng(lat, lng));
+              
+              if (distInfo < 800) { // 800 meters tolerance
+                return true; 
+              }
+            }
+            
+            return false;
           }).toList();
 
           if (filteredRides.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.directions_car_outlined, size: 60, color: Colors.grey),
-                  SizedBox(height: 10),
-                  Text('Aucun trajet vers EST Agadir pour le moment.', style: TextStyle(color: Colors.grey)),
-                ],
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.commute_outlined, size: 80, color: Colors.grey[300]),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Aucun trajet ne passe par votre position.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Essayez de vous rapprocher d\'une route principale.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
               ),
             );
           }
 
-          final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
+              final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16.0),
-            itemCount: filteredRides.length,
-            itemBuilder: (context, index) {
-              final ride = filteredRides[index];
-              final data = ride.data() as Map<String, dynamic>;
+              return ListView.builder(
+                padding: const EdgeInsets.all(16.0),
+                itemCount: filteredRides.length,
+                itemBuilder: (context, index) {
+                  final ride = filteredRides[index];
+                  final data = ride.data() as Map<String, dynamic>;
 
-              String formattedDate = "Date inconnue";
-              try {
-                if (data['date'] != null && data['date'] is Timestamp) {
-                  formattedDate = DateFormat('dd/MM/yyyy HH:mm').format((data['date'] as Timestamp).toDate());
-                }
-              } catch (e) {
-                formattedDate = "Erreur date";
-              }
+                  String formattedDate = "Date inconnue";
+                  try {
+                    if (data['date'] != null && data['date'] is Timestamp) {
+                      formattedDate = DateFormat('dd/MM/yyyy HH:mm').format((data['date'] as Timestamp).toDate());
+                    }
+                  } catch (e) {
+                    formattedDate = "Erreur date";
+                  }
 
-              String driverName = data['driverName']?.toString() ?? "Inconnu";
-              String destinationName = data['destinationName']?.toString() ?? "EST Agadir";
-              // Get departure address with fallback to coordinates
-              String departureCity = data['departureAddress']?.toString() ?? 
-                  "${(data['startLat'] as num?)?.toStringAsFixed(2) ?? '?'}, ${(data['startLng'] as num?)?.toStringAsFixed(2) ?? '?'}";
-              String price = data['price']?.toString() ?? "?";
-              String seats = data['seats']?.toString() ?? "0";
-              String? phone = data['phone']?.toString();
-              DateTime rideDate = (data['date'] as Timestamp).toDate();
-              
-              List<LatLng> polylinePoints = [];
-              if (data['polylinePoints'] != null) {
-                polylinePoints = (data['polylinePoints'] as List<dynamic>)
-                    .map((p) => LatLng((p['latitude'] as num).toDouble(), (p['longitude'] as num).toDouble()))
-                    .toList();
-              }
+                  String driverName = data['driverName']?.toString() ?? "Inconnu";
+                  String destinationName = data['destinationName']?.toString() ?? "EST Agadir";
+                  // Get departure address with fallback to coordinates
+                  String departureCity = data['departureAddress']?.toString() ?? 
+                      "${(data['startLat'] as num?)?.toStringAsFixed(2) ?? '?'}, ${(data['startLng'] as num?)?.toStringAsFixed(2) ?? '?'}";
+                  String price = data['price']?.toString() ?? "?";
+                  String seats = data['seats']?.toString() ?? "0";
+                  String? phone = data['phone']?.toString();
+                  DateTime rideDate = (data['date'] as Timestamp).toDate();
+                  
+                  List<LatLng> polylinePoints = [];
+                  if (data['polylinePoints'] != null) {
+                    polylinePoints = (data['polylinePoints'] as List<dynamic>)
+                        .map((p) => LatLng((p['latitude'] as num).toDouble(), (p['longitude'] as num).toDouble()))
+                        .toList();
+                  }
 
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 10.0),
-                elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                child: InkWell(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => RideMapViewer(
-                          polylinePoints: polylinePoints,
-                          driverName: driverName,
-                          phone: phone,
-                          price: price,
-                          date: rideDate,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(15.0),
+                  final bool isMyRide = currentUserUid == data['driverId'];
+                  final String vehicleType = data['vehicleType'] ?? 'Voiture';
+                  final int availableSeats = int.tryParse(data['seats'].toString()) ?? 0;
+
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 10.0),
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                     child: Stack(
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Conducteur: $driverName',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent),
-                                ),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(10)),
-                                      child: Text('$price MAD', style: TextStyle(color: Colors.green[800], fontWeight: FontWeight.bold)),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    if (currentUserUid == data['driverId'])
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, color: Colors.red),
-                                        onPressed: () async {
-                                          final bool? confirmDelete = await showDialog<bool>(
-                                            context: context,
-                                            builder: (BuildContext dialogContext) {
-                                              return AlertDialog(
-                                                title: const Text('Supprimer le trajet ?'),
-                                                content: const Text('Voulez-vous vraiment supprimer ce trajet ?'),
-                                                actions: <Widget>[
-                                                  TextButton(
-                                                    onPressed: () => Navigator.of(dialogContext).pop(false),
-                                                    child: const Text('Annuler'),
-                                                  ),
-                                                  TextButton(
-                                                    onPressed: () => Navigator.of(dialogContext).pop(true),
-                                                    child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-                                                  ),
-                                                ],
-                                              );
-                                            },
-                                          );
-
-                                          if (confirmDelete == true) {
-                                            try {
-                                              await FirebaseFirestore.instance.collection('rides').doc(ride.id).delete();
-                                              _showSnackBar(context, 'Trajet supprimé avec succès !', Colors.green);
-                                            } catch (e) {
-                                              _showSnackBar(context, 'Erreur lors de la suppression: ${e.toString()}', Colors.redAccent);
-                                            }
-                                          }
-                                        },
+                        Padding(
+                          padding: const EdgeInsets.all(15.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Header: Driver + Price + Vehicle Icon
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      UserAvatar(
+                                        userName: driverName,
+                                        imageUrl: data['driverPhotoUrl'],
+                                        radius: 20,
+                                        backgroundColor: Colors.blue[100],
+                                        textColor: Colors.blue[800],
                                       ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const Divider(height: 20),
-                            
-                            // Prominent route display
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.blue[50],
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.blue[200]!, width: 1),
+                                      const SizedBox(width: 10),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            driverName,
+                                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                          ),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                vehicleType == 'Moto' ? Icons.two_wheeler : Icons.directions_car,
+                                                size: 14,
+                                                color: Colors.grey[600],
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(vehicleType, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green[50],
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                                    ),
+                                    child: Text(
+                                      '$price MAD',
+                                      style: TextStyle(color: Colors.green[800], fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              child: Row(
+                              
+                              const Divider(height: 25),
+                              
+                              // Route
+                              Row(
                                 children: [
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          'De:',
-                                          style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.w500),
-                                        ),
-                                        Text(
-                                          departureCity,
-                                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                        Text('Départ', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                                        Text(departureCity, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
                                       ],
                                     ),
                                   ),
-                                  Icon(Icons.arrow_forward, color: Colors.blue[600]),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                                    child: Icon(Icons.arrow_forward, color: Colors.blue[300]),
+                                  ),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
-                                        Text(
-                                          'À:',
-                                          style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.w500),
-                                        ),
-                                        Text(
-                                          destinationName,
-                                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                        Text('Arrivée', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                                        Text(destinationName, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
                                       ],
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            
-                            _buildDetailRow(Icons.calendar_today, 'Date: $formattedDate'),
-                            _buildDetailRow(Icons.event_seat, 'Sièges disponibles: $seats'),
+                              
+                              const SizedBox(height: 15),
 
-                            const SizedBox(height: 15),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: Text(
-                                '📍 Voir le trajet sur la carte',
-                                style: TextStyle(color: Colors.blue[600], fontSize: 14, fontWeight: FontWeight.w600),
+                              // Info Grid
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                                      const SizedBox(width: 5),
+                                      Text(formattedDate, style: TextStyle(color: Colors.grey[800])),
+                                    ],
+                                  ),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.event_seat, size: 16, color: Colors.grey[600]),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        '$seats place(s)',
+                                        style: TextStyle(
+                                          color: availableSeats > 0 ? Colors.grey[800] : Colors.red,
+                                          fontWeight: availableSeats > 0 ? FontWeight.normal : FontWeight.bold
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 20),
+
+                              // Actions
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (context) => RideMapViewer(
+                                              polylinePoints: polylinePoints,
+                                              driverName: driverName,
+                                              phone: phone,
+                                              price: price,
+                                              date: rideDate,
+                                              rideId: ride.id,
+                                              rideData: data,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.map, size: 18),
+                                      label: const Text("Voir Carte"),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.blue,
+                                        side: const BorderSide(color: Colors.blue),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  if (!isMyRide)
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: availableSeats > 0 
+                                          ? () => _reserveRide(context, ride.id, data) 
+                                          : null,
+                                        icon: const Icon(Icons.bookmark_add, size: 18),
+                                        label: const Text("Réserver"),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.blue[700],
+                                          foregroundColor: Colors.white,
+                                          disabledBackgroundColor: Colors.grey[300],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // COMPLET OVERLAY
+                        if (availableSeats == 0)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.85),
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: Center(
+                                child: Transform.rotate(
+                                  angle: -0.2, // Slightly tilted
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.red, width: 4),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Text(
+                                      "COMPLET",
+                                      style: TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 4,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
                       ],
                     ),
-                  ),
-                ),
+                  );
+                },
               );
-            },
-          );
         },
       ),
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3.0),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.grey[600], size: 18),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 15, color: Colors.black87))),
+  Future<void> _reserveRide(BuildContext context, String rideId, Map<String, dynamic> rideData) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showSnackBar(context, "Vous devez être connecté.", Colors.red);
+      return;
+    }
+
+    // Confirmation Dialog
+    bool? confirm = await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Confirmer la réservation"),
+        content: const Text("Voulez-vous envoyer une demande de réservation au conducteur ?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler")),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Confirmer"),
+          ),
         ],
       ),
     );
+
+    if (confirm != true) return;
+
+    try {
+      // Check if already reserved
+      final existing = await FirebaseFirestore.instance
+          .collection('bookings')
+          .where('rideId', isEqualTo: rideId)
+          .where('passengerId', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (existing.docs.isNotEmpty) {
+        if (!context.mounted) return;
+        _showSnackBar(context, "Vous avez déjà réservé ce trajet.", Colors.orange);
+        return;
+      }
+
+      // Add Booking
+      await FirebaseFirestore.instance.collection('bookings').add({
+        'rideId': rideId,
+        'driverId': rideData['driverId'],
+        'passengerId': user.uid,
+        'passengerName': user.displayName ?? user.email?.split('@')[0] ?? 'Passager',
+        'passengerPhotoUrl': user.photoURL,
+        'status': 'pending', // pending, accepted, rejected
+        'timestamp': FieldValue.serverTimestamp(),
+        'rideDestination': rideData['destinationName'] ?? 'EST Agadir',
+        'rideDate': rideData['date'],
+        'ridePrice': rideData['price'],
+        'driverName': rideData['driverName'],
+        'driverPhotoUrl': rideData['driverPhotoUrl'],
+        'driverPhone': rideData['phone'], // Stored so passenger can see it IF accepted
+        'departureAddress': rideData['departureAddress'],
+      });
+
+      if (!context.mounted) return;
+      _showSnackBar(context, "Demande envoyée ! Vérifiez 'Mes Trajets'.", Colors.green);
+
+    } catch (e) {
+      if (!context.mounted) return;
+      _showSnackBar(context, "Erreur: $e", Colors.red);
+    }
   }
 }

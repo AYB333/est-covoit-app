@@ -41,7 +41,7 @@ class LanguageService extends ChangeNotifier {
       case 'en':
         return const Locale('en');
       case 'darija':
-        return const Locale('ar'); // Arabic locale for Darija
+        return const Locale('fr'); // Force LTR for Latin-script Darija
       case 'fr':
       default:
         return const Locale('fr');

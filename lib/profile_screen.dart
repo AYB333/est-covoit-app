@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'translations.dart';
+import 'user_avatar.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -13,6 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   bool _isSaving = false;
+  bool _isUploadingImage = false;
 
   @override
   void initState() {
@@ -42,6 +49,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
         margin: const EdgeInsets.all(16),
       ),
     );
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+
+    if (pickedFile == null) return;
+
+    setState(() => _isUploadingImage = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final file = File(pickedFile.path);
+      final ref = FirebaseStorage.instance.ref().child('profile_images/${user.uid}.jpg');
+      
+      // Upload
+      final metadata = SettableMetadata(contentType: 'image/jpeg');
+      final uploadTask = ref.putFile(file, metadata);
+      
+      final snapshot = await uploadTask.whenComplete(() => null);
+
+      if (snapshot.state == TaskState.success) {
+        // Small delay to ensure consistency
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+        await user.updatePhotoURL(downloadUrl);
+        await user.reload(); 
+
+        // --- UPDATE FIRESTORE DOCUMENTS ---
+        final db = FirebaseFirestore.instance;
+        final batch = db.batch(); // Use batch for atomicity
+
+        // 1. Update rides where I am the driver
+        final ridesQuery = await db.collection('rides').where('driverId', isEqualTo: user.uid).get();
+        for (var doc in ridesQuery.docs) {
+          batch.update(doc.reference, {'driverPhotoUrl': downloadUrl});
+        }
+
+        // 2. Update bookings where I am the passenger
+        final passengerBookings = await db.collection('bookings').where('passengerId', isEqualTo: user.uid).get();
+        for (var doc in passengerBookings.docs) {
+          batch.update(doc.reference, {'passengerPhotoUrl': downloadUrl});
+        }
+
+        // 3. Update bookings where I am the driver
+        final driverBookings = await db.collection('bookings').where('driverId', isEqualTo: user.uid).get();
+        for (var doc in driverBookings.docs) {
+          batch.update(doc.reference, {'driverPhotoUrl': downloadUrl});
+        }
+
+        await batch.commit();
+        // ----------------------------------
+        
+        if (mounted) {
+          setState(() {}); 
+          _showSnackBar("Photo de profil mise à jour et synchronisée !", Colors.green);
+        }
+      } else {
+         throw Exception("Statut upload incorrect: ${snapshot.state}");
+      }
+    } catch (e) {
+      // Check for specific firebase error
+      String errorMsg = "Erreur upload: $e";
+      if (e.toString().contains("object-not-found")) {
+        errorMsg = "Erreur: Le fichier n'a pas été créé. Vérifiez vos Règles de Stockage Firebase.";
+      } else if (e.toString().contains("unauthorized")) {
+         errorMsg = "Erreur: Permission refusée. Vérifiez vos Règles de Stockage.";
+      }
+      _showSnackBar(errorMsg, Colors.redAccent);
+    } finally {
+       if (mounted) setState(() => _isUploadingImage = false);
+    }
   }
 
   Future<void> _saveName() async {
@@ -148,34 +230,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Avatar Section with Camera Badge
+            // Avatar Section with Camera Badge
             Center(
               child: Stack(
                 children: [
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                    ),
-                    child: Icon(
-                      Icons.person,
-                      size: 70,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  Positioned(
+                   UserAvatar(
+                     userName: _nameController.text,
+                     imageUrl: FirebaseAuth.instance.currentUser?.photoURL,
+                     radius: 60,
+                     backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                     textColor: Theme.of(context).colorScheme.primary,
+                     fontSize: 40,
+                   ),
+                   Positioned(
                     bottom: 0,
                     right: 0,
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Theme.of(context).colorScheme.primary,
-                        border: Border.all(color: Colors.white, width: 3),
+                    child: GestureDetector(
+                      onTap: _isUploadingImage ? null : _pickAndUploadImage,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Theme.of(context).colorScheme.primary,
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
+                        child: _isUploadingImage 
+                          ? const Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.camera_alt, color: Colors.white, size: 20),
                       ),
-                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
                     ),
                   ),
                 ],

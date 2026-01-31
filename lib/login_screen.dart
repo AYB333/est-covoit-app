@@ -29,6 +29,11 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    if (!_emailController.text.trim().endsWith("@edu.uiz.ac.ma")) {
+      _showError("Veuillez utiliser votre email académique (@edu.uiz.ac.ma).");
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {

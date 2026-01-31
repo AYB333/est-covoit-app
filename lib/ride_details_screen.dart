@@ -11,8 +11,17 @@ import 'package:geocoding/geocoding.dart';
 
 class RideDetailsScreen extends StatefulWidget {
   final LatLng startLocation;
+  final String? initialAddress;
+  final String? rideId;
+  final Map<String, dynamic>? rideData;
 
-  const RideDetailsScreen({super.key, required this.startLocation});
+  const RideDetailsScreen({
+    super.key, 
+    required this.startLocation, 
+    this.initialAddress,
+    this.rideId,
+    this.rideData,
+  });
 
   @override
   State<RideDetailsScreen> createState() => _RideDetailsScreenState();
@@ -20,32 +29,105 @@ class RideDetailsScreen extends StatefulWidget {
 
 class _RideDetailsScreenState extends State<RideDetailsScreen> {
   final MapController _mapController = MapController();
+  
+  // Variables State
   LatLng? _pickedLocation;
-  String? _departureAddress; // New field for departure address
+  String? _departureAddress;
   List<LatLng> _routePoints = [];
   bool _isLoadingMap = false;
   bool _isLoadingPublish = false;
 
-  final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+  // Controllers
   final TextEditingController _departureAddressController = TextEditingController();
+  final TextEditingController _dateController = TextEditingController();
+  
   DateTime? _selectedDate;
   double _seats = 1;
 
-  // Corrected coordinates for EST Agadir (Destination)
-      static const LatLng _estAgadirLocation = LatLng(30.4070, -9.5790);
+  // Vehicle type & pricing logic
+  String _selectedVehicle = 'Voiture';
+  double _routeDistanceKm = 0.0;
+  double _minPrice = 0.0;
+  double _maxPrice = 0.0;
+  double _price = 0.0;
+  final double _priceStep = 0.5;
+
+  // Destination: EST Agadir
+  static const LatLng _estAgadirLocation = LatLng(30.4070, -9.5790);
+
+  bool get _isEditing => widget.rideId != null;
 
   @override
   void initState() {
     super.initState();
-    // _pickedLocation is initially null, route is drawn only on user interaction
+    
+    // Check if it's the default location from HomeScreen
+    bool isDefault = (widget.startLocation.latitude == 30.4000 && widget.startLocation.longitude == -9.6000);
+
+    // Initial setup
+    if (_isEditing && widget.rideData != null) {
+      _pickedLocation = widget.startLocation;
+      _loadRideData();
+    } else {
+      if (isDefault) {
+        // Don't show any route or marker initially
+        _pickedLocation = null;
+      } else {
+        _pickedLocation = widget.startLocation;
+        if (widget.initialAddress != null && widget.initialAddress!.isNotEmpty) {
+          _departureAddress = widget.initialAddress;
+          _departureAddressController.text = widget.initialAddress!;
+        } else {
+          _geocodeLocation(widget.startLocation);
+        }
+        _fetchRoute(widget.startLocation);
+      }
+    }
+  }
+
+  void _loadRideData() {
+    try {
+      final data = widget.rideData!;
+      
+      // 1. Basic Fields
+      _departureAddress = data['departureAddress'];
+      _departureAddressController.text = _departureAddress ?? '';
+      _selectedVehicle = data['vehicleType'] ?? 'Voiture';
+      
+      // Safe casting for numbers
+      _price = (data['price'] as num?)?.toDouble() ?? 0.0;
+      _seats = (data['seats'] as num?)?.toDouble() ?? 1.0;
+      if (_seats < 1.0) _seats = 1.0; 
+      if (_seats > 4.0) _seats = 4.0;
+      
+      // 2. Date
+      if (data['date'] != null) {
+        if (data['date'] is Timestamp) {
+          _selectedDate = (data['date'] as Timestamp).toDate();
+        } else if (data['date'] is String) {
+           try {
+             _selectedDate = DateTime.parse(data['date']);
+           } catch (_) {}
+        }
+        
+        if (_selectedDate != null) {
+           _dateController.text = DateFormat('dd/MM/yyyy HH:mm').format(_selectedDate!);
+        }
+      }
+      
+      // 3. Location & Route
+      _fetchRoute(widget.startLocation);
+    } catch (e) {
+      debugPrint("Error loading ride data: $e");
+      _price = 10.0;
+      _seats = 4.0;
+    }
   }
 
   @override
   void dispose() {
-    _priceController.dispose();
-    _phoneController.dispose();
     _departureAddressController.dispose();
+    _dateController.dispose();
     super.dispose();
   }
 
@@ -56,92 +138,29 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
-  /// Geocode the picked location to get the address
-  /// If successful, return the formatted address
-  /// If failed, prompt user to enter manual address
   Future<void> _geocodeLocation(LatLng location) async {
     try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        location.latitude,
-        location.longitude,
-      );
-      
+      List<Placemark> placemarks = await placemarkFromCoordinates(location.latitude, location.longitude);
       if (placemarks.isNotEmpty) {
         Placemark place = placemarks.first;
-        // Build address from available fields
         final String address = [
-          place.locality,
-          place.administrativeArea,
-          place.country,
-        ].where((e) => e != null && e.isNotEmpty).join(', ');
-        
+          if ((place.locality ?? '').isNotEmpty) place.locality!,
+          if ((place.street ?? '').isNotEmpty) place.street!,
+        ].join(', ');
+
         if (address.isNotEmpty) {
           setState(() {
             _departureAddress = address;
             _departureAddressController.text = address;
           });
-          return;
         }
       }
-    } catch (e) {
-      print('Geocoding error: $e');
-    }
-    
-    // If geocoding fails, prompt for manual entry
-    _showManualAddressDialog();
-  }
-
-  void _showManualAddressDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Entrer le nom du lieu'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Impossible de détecter automatiquement l\'adresse. Veuillez entrer un nom pour ce lieu (ex: "Dcheira", "Près de la Mosquée")'),
-              const SizedBox(height: 15),
-              TextField(
-                controller: _departureAddressController,
-                decoration: InputDecoration(
-                  labelText: 'Nom du lieu',
-                  hintText: 'ex: Dcheira, Agadir Bay',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final String customAddress = _departureAddressController.text.trim();
-                if (customAddress.isNotEmpty) {
-                  setState(() {
-                    _departureAddress = customAddress;
-                  });
-                  Navigator.pop(context);
-                } else {
-                  _showSnackBar('Veuillez entrer un nom', Colors.redAccent);
-                }
-              },
-              child: const Text('Valider'),
-            ),
-          ],
-        );
-      },
-    );
+    } catch (_) {}
   }
 
   Future<void> _fetchRoute(LatLng startPoint) async {
@@ -150,284 +169,266 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
       _routePoints.clear();
     });
 
-    final String osrmApiUrl = 'http://router.project-osrm.org/route/v1/driving/'
+    final String osrmApiUrl = 'https://routing.openstreetmap.de/routed-car/route/v1/driving/'
         '${startPoint.longitude},${startPoint.latitude};'
         '${_estAgadirLocation.longitude},${_estAgadirLocation.latitude}'
         '?overview=full&geometries=geojson';
 
     try {
       final response = await http.get(Uri.parse(osrmApiUrl));
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List<dynamic> coordinates = data['routes'][0]['geometry']['coordinates'];
         setState(() {
-          _routePoints = coordinates
-              .map((coord) => LatLng(coord[1], coord[0])) // OSRM returns [lng, lat]
-              .toList();
+          _routePoints = coordinates.map((coord) => LatLng(coord[1], coord[0])).toList();
+          _routeDistanceKm = (data['routes'][0]['distance'] as num) / 1000.0;
         });
-      } else {
-        _showSnackBar('Erreur de routage: ${response.statusCode}', Colors.redAccent);
+        _updatePriceBounds();
       }
     } catch (e) {
-      _showSnackBar('Erreur de connexion OSRM: ${e.toString()}', Colors.redAccent);
+      _showSnackBar('Erreur connexion carte', Colors.redAccent);
     } finally {
-      setState(() {
-        _isLoadingMap = false;
-      });
+      setState(() => _isLoadingMap = false);
     }
+  }
+
+  void _updatePriceBounds() {
+    final bool isMoto = _selectedVehicle == 'Moto';
+    final double rate = isMoto ? 0.5 : 1.0;
+    double calculatedPrice = _routeDistanceKm * rate;
+    if (calculatedPrice < 2.0) calculatedPrice = 2.0;
+
+    double minP = calculatedPrice * 0.8;
+    double maxP = calculatedPrice * 1.2;
+
+    minP = (minP * 2).round() / 2;
+    maxP = (maxP * 2).round() / 2;
+
+    if (maxP <= minP) maxP = minP + 1.0;
+
+    setState(() {
+      _minPrice = minP;
+      _maxPrice = maxP;
+
+      if (_price == 0 || _price < _minPrice || _price > _maxPrice) {
+        _price = (calculatedPrice * 2).round() / 2;
+        if (_price < _minPrice) _price = _minPrice;
+        if (_price > _maxPrice) _price = _maxPrice;
+      }
+
+      if (isMoto) _seats = 1;
+    });
   }
 
   void _handleMapTap(TapPosition tapPosition, LatLng latlng) {
-    setState(() {
-      _pickedLocation = latlng;
-    });
+    setState(() => _pickedLocation = latlng);
     _fetchRoute(latlng);
-    _geocodeLocation(latlng); // Get address for the picked location
+    _geocodeLocation(latlng);
   }
 
   Future<void> _goToCurrentLocation() async {
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        _showSnackBar('Les permissions de localisation sont refusées.', Colors.redAccent);
-        return;
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      _showSnackBar('Les permissions de localisation sont refusées de manière permanente.', Colors.redAccent);
-      return;
-    }
-
     try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      LatLng currentLocation = LatLng(position.latitude, position.longitude);
-
-      _mapController.move(currentLocation, 13.0);
-      setState(() {
-        _pickedLocation = currentLocation;
-      });
-      _fetchRoute(currentLocation);
-      _geocodeLocation(currentLocation); // Get address for current location
-    } catch (e) {
-      _showSnackBar('Impossible d\'obtenir la position actuelle: ${e.toString()}', Colors.redAccent);
-    }
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      LatLng loc = LatLng(position.latitude, position.longitude);
+      _mapController.move(loc, 13.0);
+      _handleMapTap(TapPosition(Offset.zero, Offset.zero), loc);
+    } catch (_) {}
   }
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: _selectedDate ?? DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime(2027),
     );
-    if (picked != null && picked != _selectedDate) {
+    
+    if (picked != null) {
+      // ignore: use_build_context_synchronously
       final TimeOfDay? pickedTime = await showTimePicker(
         context: context,
-        initialTime: TimeOfDay.now(),
+        initialTime: _selectedDate != null 
+          ? TimeOfDay.fromDateTime(_selectedDate!)
+          : TimeOfDay.now(),
       );
+      
       if (pickedTime != null) {
+        final DateTime fullDate = DateTime(
+          picked.year, picked.month, picked.day, 
+          pickedTime.hour, pickedTime.minute
+        );
+        
         setState(() {
-          _selectedDate = DateTime(
-            picked.year,
-            picked.month,
-            picked.day,
-            pickedTime.hour,
-            pickedTime.minute,
-          );
+          _selectedDate = fullDate;
+          _dateController.text = DateFormat('dd/MM/yyyy HH:mm').format(fullDate);
         });
       }
-    }
-  }
-
-  Future<void> _publishRide() async {
-    if (_priceController.text.isEmpty ||
-        _phoneController.text.isEmpty ||
-        _selectedDate == null ||
-        _pickedLocation == null ||
-        _routePoints.isEmpty ||
-        _departureAddress == null || _departureAddress!.isEmpty) {
-      _showSnackBar('Veuillez sélectionner un point de départ avec une adresse et remplir tous les champs.', Colors.redAccent);
-      return;
-    }
-
-    setState(() {
-      _isLoadingPublish = true;
-    });
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        _showSnackBar('Vous devez être connecté pour publier un trajet.', Colors.redAccent);
-        setState(() {
-          _isLoadingPublish = false;
-        });
-        return;
-      }
-
-      List<Map<String, double>> polylineData = _routePoints
-          .map((latlng) => {'latitude': latlng.latitude, 'longitude': latlng.longitude})
-          .toList();
-
-      await FirebaseFirestore.instance.collection('rides').add({
-        'driverId': user.uid,
-        'driverName': user.displayName ?? user.email ?? 'Utilisateur Inconnu',
-        'phone': _phoneController.text,
-        'price': double.parse(_priceController.text),
-        'seats': _seats.toInt(),
-        'date': Timestamp.fromDate(_selectedDate!),
-        'startLat': _pickedLocation!.latitude,
-        'startLng': _pickedLocation!.longitude,
-        'departureAddress': _departureAddress, // New field for address
-        'destinationLat': _estAgadirLocation.latitude,
-        'destinationLng': _estAgadirLocation.longitude,
-        'destinationName': 'EST Agadir',
-        'status': 'available',
-        'createdAt': FieldValue.serverTimestamp(),
-        'polylinePoints': polylineData,
-      });
-
-      if (!mounted) return;
-      _showSnackBar('Trajet publié avec succès !', Colors.green);
-      Navigator.of(context).pop();
-    } on FirebaseException catch (e) {
-      _showSnackBar('Erreur Firebase: ${e.message}', Colors.redAccent);
-    } catch (e) {
-      _showSnackBar('Erreur: ${e.toString()}', Colors.redAccent);
-    } finally {
-      setState(() {
-        _isLoadingPublish = false;
-      });
     }
   }
 
   void _showRideDetailsForm() {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (BuildContext context) {
-      // StatefulBuilder allows the BottomSheet to rebuild itself
-      return StatefulBuilder(
-        builder: (BuildContext context, StateSetter setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              left: 20,
-              right: 20,
-              top: 20,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Confirmer les détails du trajet',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue[800]),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                
-                // Prix
-                TextField(
-                  controller: _priceController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Prix (MAD)',
-                    prefixIcon: const Icon(Icons.money),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 15),
-                
-                // Téléphone
-                TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: 'Numéro de téléphone',
-                    prefixIcon: const Icon(Icons.phone),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 15),
-                
-                // Date Picker
-                GestureDetector(
-                  onTap: () async {
-                    await _selectDate(context);
-                    // Update modal to show the new date text
-                    setModalState(() {}); 
-                  },
-                  child: AbsorbPointer(
-                    child: TextField(
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            void update(VoidCallback fn) {
+              setModalState(fn);
+              setState(fn);
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 20, right: 20, top: 20
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _isEditing ? 'Modifier le trajet' : 'Confirmer les détails du trajet', 
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue[800]), 
+                      textAlign: TextAlign.center
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 1. VEHICULE
+                    const Text('Type de véhicule', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Expanded(child: RadioListTile<String>(
+                          title: const Text('Voiture'), value: 'Voiture', groupValue: _selectedVehicle,
+                          activeColor: Colors.deepPurple,
+                          onChanged: (val) => update(() { _selectedVehicle = val!; _updatePriceBounds(); })
+                        )),
+                        Expanded(child: RadioListTile<String>(
+                          title: const Text('Moto'), value: 'Moto', groupValue: _selectedVehicle,
+                          activeColor: Colors.deepPurple,
+                          onChanged: (val) => update(() { _selectedVehicle = val!; _updatePriceBounds(); })
+                        )),
+                      ],
+                    ),
+
+                    // 2. PRIX
+                    const Text('Prix du trajet', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                          onPressed: _price > _minPrice ? () => update(() => _price = (_price - _priceStep).clamp(_minPrice, _maxPrice)) : null
+                        ),
+                        Expanded(child: Center(child: Text('${_price.toStringAsFixed(1)} MAD', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)))),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                          onPressed: _price < _maxPrice ? () => update(() => _price = (_price + _priceStep).clamp(_minPrice, _maxPrice)) : null
+                        ),
+                      ],
+                    ),
+                    Center(child: Text('Prix autorisé : $_minPrice - $_maxPrice MAD', style: const TextStyle(fontSize: 12, color: Colors.grey))),
+                    const SizedBox(height: 15),
+
+                    // 4. DATE
+                    TextField(
+                      controller: _dateController,
+                      readOnly: true,
+                      onTap: () async {
+                        await _selectDate(context);
+                        setModalState(() {}); 
+                      },
                       decoration: InputDecoration(
-                        labelText: _selectedDate == null
-                            ? 'Date et heure du trajet'
-                            : DateFormat('dd/MM/yyyy HH:mm').format(_selectedDate!),
+                        labelText: 'Date et heure du trajet',
                         prefixIcon: const Icon(Icons.calendar_today),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 15),
-                
-                // SLIDER FIX
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Nombre de sièges: ${_seats.toInt()}',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    Slider(
-                      value: _seats,
-                      min: 1,
-                      max: 4, // Reasonable max for a car
-                      divisions: 3,
-                      label: _seats.toInt().toString(),
-                      activeColor: Colors.blue[800],
-                      onChanged: (value) {
-                        // Update BOTH the local modal state and the parent state
-                        setModalState(() => _seats = value);
-                        setState(() => _seats = value);
+                    const SizedBox(height: 15),
+
+                    // 5. SIEGES
+                    if (_selectedVehicle == 'Voiture') ...[
+                      Text('Nombre de sièges: ${_seats.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Slider(
+                        value: _seats, min: 1, max: 4, divisions: 3,
+                        activeColor: Colors.blue[800],
+                        onChanged: (val) => update(() => _seats = val),
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _isLoadingPublish ? null : () {
+                        Navigator.pop(context);
+                        _publishRide();
                       },
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      child: _isLoadingPublish 
+                        ? const CircularProgressIndicator(color: Colors.white) 
+                        : Text(_isEditing ? "Enregistrer les modifications" : "Publier le trajet", style: const TextStyle(fontSize: 18, color: Colors.white)),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
-                const SizedBox(height: 20),
-                
-                // Save Button
-                ElevatedButton(
-                  onPressed: _isLoadingPublish ? null : () {
-                    Navigator.pop(context); // Close modal first
-                    _publishRide(); // Then save
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: _isLoadingPublish
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text("Publier le trajet", style: TextStyle(fontSize: 18, color: Colors.white)),
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
-}
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _publishRide() async {
+    if (_selectedDate == null || _departureAddress == null) {
+      _showSnackBar('Veuillez remplir tous les champs', Colors.redAccent);
+      return;
+    }
+
+    setState(() => _isLoadingPublish = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        List<Map<String, double>> polylineData = _routePoints
+            .map((latlng) => {'latitude': latlng.latitude, 'longitude': latlng.longitude})
+            .toList();
+
+        final Map<String, dynamic> rideData = {
+          'driverId': user.uid,
+          'driverName': user.displayName ?? 'Utilisateur',
+          'driverPhotoUrl': user.photoURL,
+          'vehicleType': _selectedVehicle,
+          'price': _price,
+          'seats': _seats.toInt(),
+          'date': Timestamp.fromDate(_selectedDate!),
+          'startLat': _pickedLocation!.latitude,
+          'startLng': _pickedLocation!.longitude,
+          'departureAddress': _departureAddress,
+          'destinationName': 'EST Agadir',
+          'status': 'available',
+          'polylinePoints': polylineData,
+          'routeDistanceKm': _routeDistanceKm,
+        };
+
+        if (_isEditing) {
+           rideData['updatedAt'] = FieldValue.serverTimestamp();
+           await FirebaseFirestore.instance.collection('rides').doc(widget.rideId).update(rideData);
+           _showSnackBar('Trajet modifié avec succès !', Colors.green);
+        } else {
+           rideData['createdAt'] = FieldValue.serverTimestamp();
+           await FirebaseFirestore.instance.collection('rides').add(rideData);
+           _showSnackBar('Trajet publié avec succès !', Colors.green);
+        }
+
+        if (mounted) Navigator.pop(context); // Revenir au Dashboard
+      }
+    } catch (e) {
+      _showSnackBar('Erreur: $e', Colors.redAccent);
+    } finally {
+      if (mounted) setState(() => _isLoadingPublish = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -437,94 +438,54 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         child: FloatingActionButton(
           onPressed: _goToCurrentLocation,
           backgroundColor: Colors.white,
-          foregroundColor: Colors.blue[700],
-          child: const Icon(Icons.my_location),
+          child: const Icon(Icons.my_location, color: Colors.blue),
         ),
       ),
       appBar: AppBar(
-        title: const Text('Proposer un trajet'),
-        backgroundColor: Colors.blue[700],
-        foregroundColor: Colors.white,
+        title: Text(_isEditing ? 'Modifier le trajet' : 'Proposer un trajet'), 
+        backgroundColor: Colors.blue[700], 
+        foregroundColor: Colors.white
       ),
       body: Stack(
         children: [
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: _estAgadirLocation,
+              initialCenter: widget.startLocation,
               initialZoom: 13.0,
               onTap: _handleMapTap,
             ),
             children: [
               TileLayer(urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
-              // Always display a marker for EST Agadir destination
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: _estAgadirLocation,
-                    width: 80,
-                    height: 80,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        const Icon(Icons.location_on, color: Colors.blue, size: 40),
-                        Positioned(
-                          bottom: 35,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.8),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: const Text(
-                              'ESTA AGADIR',
-                              style: TextStyle(color: Colors.white, fontSize: 10),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ), // Destination Marker
-                  ),
-                  if (_pickedLocation != null)
-                    Marker(
-                      point: _pickedLocation!,
-                      width: 80,
-                      height: 80,
-                      child: const Icon(Icons.location_pin, color: Colors.red, size: 40), // Start Marker (Picked Location)
-                    ),
-                ],
-              ),
               if (_routePoints.isNotEmpty)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: _routePoints,
-                      color: Colors.blue,
-                      strokeWidth: 5.0,
-                    ),
-                  ],
-                ),
+                PolylineLayer(polylines: [Polyline(points: _routePoints, color: Colors.blue, strokeWidth: 5.0)]),
+              MarkerLayer(markers: [
+                Marker(point: _estAgadirLocation, child: const Icon(Icons.location_on, color: Colors.blue, size: 40)),
+                if (_pickedLocation != null)
+                  Marker(point: _pickedLocation!, child: const Icon(Icons.location_pin, color: Colors.red, size: 40)),
+              ]),
             ],
           ),
-          if (_isLoadingMap)
-            const Center(
-              child: CircularProgressIndicator(color: Colors.blueAccent),
-            ),
-          if (_pickedLocation != null && _routePoints.isNotEmpty)
+          if (_isLoadingMap) const Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
+          
+          if (_pickedLocation != null)
             Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
+              bottom: 20, left: 20, right: 20,
               child: ElevatedButton(
-                onPressed: _showRideDetailsForm,
+                onPressed: () {
+                  _updatePriceBounds();
+                  _showRideDetailsForm();
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                child: const Text('Confirmer le trajet'),
+                child: Text(
+                  _isEditing ? 'Confirmer les modifications' : 'Confirmer le trajet', 
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                ),
               ),
             ),
         ],
