@@ -40,6 +40,8 @@ class LanguageService extends ChangeNotifier {
     switch (_currentLanguage) {
       case 'en':
         return const Locale('en');
+      case 'ar':
+        return const Locale('ar'); // RTL
       case 'darija':
         return const Locale('fr'); // Force LTR for Latin-script Darija
       case 'fr':

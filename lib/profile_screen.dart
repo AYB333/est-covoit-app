@@ -17,6 +17,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
+  late TextEditingController _phoneController;
   late TextEditingController _emailController;
   bool _isSaving = false;
   bool _isUploadingImage = false;
@@ -31,12 +32,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _emailController = TextEditingController(
       text: user?.email ?? '',
     );
+    _phoneController = TextEditingController(); // Init empty first
+
+    // Fetch Phone Number from Firestore
+    if (user != null) {
+      FirebaseFirestore.instance.collection('users').doc(user.uid).get().then((doc) {
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data() as Map<String, dynamic>;
+          if (mounted && data.containsKey('phoneNumber')) {
+             setState(() {
+               _phoneController.text = data['phoneNumber'];
+             });
+          }
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -134,9 +151,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     setState(() => _isSaving = true);
+    setState(() => _isSaving = true);
     try {
-      await FirebaseAuth.instance.currentUser?.updateDisplayName(newName);
-      await FirebaseAuth.instance.currentUser?.reload();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Update display name
+        await user.updateDisplayName(newName);
+        await user.reload();
+        
+        // Save Phone Number to Firestore
+        final phone = _phoneController.text.trim();
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'phoneNumber': phone,
+        }, SetOptions(merge: true));
+      }
+
       if (!context.mounted) return;
       _showSnackBar(Translations.getText(context, 'profile_updated'), Colors.green);
     } catch (e) {
@@ -297,6 +326,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 filled: true,
                 fillColor: isDark ? Colors.grey[800] : Colors.grey[100],
                 prefixIcon: const Icon(Icons.email),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Phone Field
+            const Text(
+              "Téléphone",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                hintText: "06 12 34 56 78",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                filled: true,
+                fillColor: isDark ? Colors.grey[800] : Colors.grey[100],
+                prefixIcon: const Icon(Icons.phone),
               ),
             ),
             const SizedBox(height: 30),

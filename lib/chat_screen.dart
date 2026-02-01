@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'user_avatar.dart';
 import 'notification_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ChatScreen extends StatefulWidget {
   final String bookingId;
@@ -96,6 +97,27 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  void _callUser() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(widget.otherUserId).get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data() as Map<String, dynamic>;
+        if (data.containsKey('phoneNumber') && data['phoneNumber'].toString().isNotEmpty) {
+           final Uri url = Uri.parse("tel:${data['phoneNumber']}");
+           if (await canLaunchUrl(url)) {
+             await launchUrl(url);
+           } else {
+             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Action impossible")));
+           }
+        } else {
+           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Numéro non disponible")));
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -166,6 +188,12 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Colors.blue[800],
         foregroundColor: Colors.white,
         elevation: 2,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.phone),
+            onPressed: _callUser,
+          ),
+        ],
       ),
       body: Container(
         color: const Color(0xFFF2F5F8), // Light Chat Background

@@ -587,46 +587,117 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _deleteBooking(String bookingId, bool isAccepted) {
-    showDialog(
+  void _deleteBooking(String bookingId, bool isAccepted) async {
+    // Confirmation Dialog
+    final bool? confirm = await showDialog<bool>(
       context: context, 
       builder: (ctx) => AlertDialog(
         title: Text(isAccepted ? "Supprimer" : "Annuler"),
         content: Text(isAccepted 
-          ? "Voulez-vous vraiment supprimer cet historique ?\n(Cela n'annulera pas le trajet côté conducteur)" 
+          ? "Voulez-vous vraiment annuler cette réservation ?\nLe conducteur sera notifié." 
           : "Voulez-vous annuler cette demande ?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Retour")),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Retour")),
           TextButton(
             onPressed: () {
-              FirebaseFirestore.instance.collection('bookings').doc(bookingId).delete();
-              Navigator.pop(ctx);
+              Navigator.pop(ctx, true);
             }, 
             child: const Text("Confirmer", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))
           )
         ],
       )
     );
+
+    if (confirm != true) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance.collection('bookings').doc(bookingId).get();
+      if (!doc.exists) return;
+      
+      final data = doc.data() as Map<String, dynamic>;
+      final String rideId = data['rideId'];
+      final String driverId = data['driverId'];
+      final String passengerName = data['passengerName'] ?? 'Un passager';
+
+      // If accepted, restore seat & notify driver
+      if (isAccepted) {
+        // Restore seat
+        await FirebaseFirestore.instance.collection('rides').doc(rideId).update({
+          'seats': FieldValue.increment(1)
+        });
+
+        // Notify Driver
+        NotificationService.sendNotification(
+          receiverId: driverId,
+          title: "Annulation Réservation",
+          body: "$passengerName a annulé sa réservation.",
+          type: "booking_cancel",
+        );
+      }
+
+      // Delete the booking document
+      await FirebaseFirestore.instance.collection('bookings').doc(bookingId).delete();
+      
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Réservation annulée/supprimée.")));
+      }
+
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+    }
   }
 
-  void _deleteRide(String rideId) {
-    showDialog(
+  void _deleteRide(String rideId) async {
+    final bool? confirm = await showDialog<bool>(
       context: context, 
       builder: (ctx) => AlertDialog(
         title: const Text("Supprimer"),
-        content: const Text("Voulez-vous supprimer ce trajet ?"),
+        content: const Text("Voulez-vous supprimer ce trajet ?\nCela annulera toutes les réservations associées."),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Annuler")),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler")),
           TextButton(
-            onPressed: () {
-              FirebaseFirestore.instance.collection('rides').doc(rideId).delete();
-              Navigator.pop(ctx);
-            }, 
+            onPressed: () => Navigator.pop(ctx, true), 
             child: const Text("Supprimer", style: TextStyle(color: Colors.red))
           )
         ],
       )
     );
+
+    if (confirm != true) return;
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      final rideRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
+      
+      // Get all bookings for this ride
+      final bookingsQuery = await FirebaseFirestore.instance.collection('bookings').where('rideId', isEqualTo: rideId).get();
+      
+      for (var doc in bookingsQuery.docs) {
+        final data = doc.data();
+        // Notify Passenger if booking was pending or accepted
+        if (data['status'] == 'pending' || data['status'] == 'accepted') {
+             NotificationService.sendNotification(
+              receiverId: data['passengerId'],
+              title: "Trajet Annulé",
+              body: "Le conducteur a annulé le trajet ${data['departureAddress'] ?? ''}.",
+              type: "ride_cancel",
+            );
+        }
+        // Delete booking
+        batch.delete(doc.reference);
+      }
+      
+      // Delete ride
+      batch.delete(rideRef);
+      
+      await batch.commit();
+      
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trajet supprimé.")));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+    }
   }
 
   // --- LOGIC: Driver Requests Modal ---
