@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'user_avatar.dart';
+import 'notification_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String bookingId;
@@ -49,6 +50,14 @@ class _ChatScreenState extends State<ChatScreen> {
         'senderId': currentUserId,
         'timestamp': FieldValue.serverTimestamp(),
       });
+      
+      // Notify Other User
+      NotificationService.sendNotification(
+        receiverId: widget.otherUserId,
+        title: "Nouveau message",
+        body: text,
+        type: "chat_message",
+      );
       
       if (_scrollController.hasClients) {
         _scrollController.animateTo(

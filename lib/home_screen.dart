@@ -10,6 +10,7 @@ import 'settings_screen.dart';
 import 'translations.dart';
 import 'chat_screen.dart';
 import 'user_avatar.dart';
+import 'notification_service.dart';
 
 
 class DashboardScreen extends StatefulWidget {
@@ -22,6 +23,13 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentIndex = 0;
   final TextEditingController _addressController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Start listening for notifications for the current user
+    NotificationService().startListening();
+  }
 
   // --- HELPER: Get User Name ---
   String _getUserName() {
@@ -705,12 +713,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 if (status == 'pending') ...[
                                   IconButton(
                                     icon: const Icon(Icons.check_circle, color: Colors.green, size: 30),
-                                    onPressed: () => _handleBooking(req.id, rideId, true, currentSeats),
+                                    onPressed: () => _handleBooking(req.id, rideId, true, currentSeats, rData['passengerId']),
                                     tooltip: "Accepter",
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.cancel, color: Colors.red, size: 30),
-                                    onPressed: () => _handleBooking(req.id, rideId, false, currentSeats),
+                                    onPressed: () => _handleBooking(req.id, rideId, false, currentSeats, rData['passengerId']),
                                     tooltip: "Refuser",
                                   ),
                                 ] else if (status == 'accepted') ...[
@@ -748,7 +756,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> _handleBooking(String bookingId, String rideId, bool accept, int currentSeats) async {
+  Future<void> _handleBooking(String bookingId, String rideId, bool accept, int currentSeats, String passengerId) async {
     if (accept) {
       if (currentSeats <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Plus de places disponibles !")));
@@ -758,9 +766,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
       await FirebaseFirestore.instance.collection('bookings').doc(bookingId).update({'status': 'accepted'});
       // Decrement Seats
       await FirebaseFirestore.instance.collection('rides').doc(rideId).update({'seats': FieldValue.increment(-1)});
+      
+      // Notify Passenger
+      NotificationService.sendNotification(
+        receiverId: passengerId,
+        title: "Réservation Acceptée !",
+        body: "Le conducteur a accepté votre demande.",
+        type: "booking_status",
+      );
+
       if (mounted) Navigator.pop(context); // Close modal to refresh seats
     } else {
       await FirebaseFirestore.instance.collection('bookings').doc(bookingId).update({'status': 'rejected'});
+      
+      // Notify Passenger
+      NotificationService.sendNotification(
+        receiverId: passengerId,
+        title: "Réservation Refusée",
+        body: "Le conducteur a refusé votre demande.",
+        type: "booking_status",
+      );
     }
   }
 

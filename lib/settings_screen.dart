@@ -4,6 +4,8 @@ import 'profile_screen.dart';
 import 'theme_service.dart';
 import 'language_service.dart';
 import 'translations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -14,6 +16,45 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+    });
+  }
+
+  Future<void> _toggleNotifications(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    if (value) {
+      // User wants to enable, ask for permission
+      bool? granted = await NotificationService().requestPermissions();
+      if (granted == true) {
+        setState(() => _notificationsEnabled = true);
+        await prefs.setBool('notifications_enabled', true);
+      } else {
+        // Permission denied
+        setState(() => _notificationsEnabled = false);
+        await prefs.setBool('notifications_enabled', false);
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(content: Text("Permission refusée. Vérifiez les paramètres de votre téléphone.")),
+           );
+        }
+      }
+    } else {
+      // User disabling
+      setState(() => _notificationsEnabled = false);
+      await prefs.setBool('notifications_enabled', false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,9 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: Text(Translations.getText(context, 'notifications')),
                   subtitle: Text(_notificationsEnabled ? 'Activées' : 'Désactivées'),
                   value: _notificationsEnabled,
-                  onChanged: (value) {
-                    setState(() => _notificationsEnabled = value);
-                  },
+                  onChanged: _toggleNotifications,
                   secondary: const Icon(Icons.notifications),
                 ),
                 Divider(

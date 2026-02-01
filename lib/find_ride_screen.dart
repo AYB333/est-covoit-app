@@ -7,6 +7,7 @@ import 'ride_map_viewer.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'user_avatar.dart';
 import 'translations.dart';
+import 'notification_service.dart';
 
 
 class FindRideScreen extends StatefulWidget {
@@ -448,6 +449,14 @@ class _FindRideScreenState extends State<FindRideScreen> {
         'driverPhone': rideData['phone'], // Stored so passenger can see it IF accepted
         'departureAddress': rideData['departureAddress'],
       });
+
+      // Notify Driver
+      NotificationService.sendNotification(
+        receiverId: rideData['driverId'],
+        title: "Nouvelle Réservation !",
+        body: "${user.displayName ?? 'Un passager'} a réservé une place.",
+        type: "booking_request",
+      );
 
       if (!context.mounted) return;
       _showSnackBar(context, "Demande envoyée ! Vérifiez 'Mes Trajets'.", Colors.green);
