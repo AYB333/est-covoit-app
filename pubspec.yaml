@@ -13,11 +13,13 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_local_notifications: ^18.0.1
+  firebase_messaging: ^15.2.1
+  googleapis_auth: ^1.4.1
   
   cupertino_icons: ^1.0.8
-  firebase_core: ^4.4.0
-  firebase_auth: ^6.1.4
-  cloud_firestore: ^6.1.2
+  firebase_core: ^3.10.1
+  firebase_auth: ^5.4.1
+  cloud_firestore: ^5.6.2
   flutter_map: ^8.2.2
   latlong2: ^0.9.1
   geolocator: ^14.0.2
@@ -28,7 +30,7 @@ dependencies:
   provider: ^6.1.5+1
   shared_preferences: ^2.2.0
   image_picker: ^1.2.1
-  firebase_storage: ^13.0.6
+  firebase_storage: ^12.4.1
 
 dev_dependencies:
   flutter_test:
@@ -39,6 +41,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/service_account.json
 
 # Config dyal l-icons
 flutter_launcher_icons:

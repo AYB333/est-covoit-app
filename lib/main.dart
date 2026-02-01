@@ -6,10 +6,20 @@ import 'login_screen.dart';
 import 'theme_service.dart';
 import 'language_service.dart';
 import 'notification_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'home_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("Background Message: ${message.messageId}");
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await NotificationService().initialize();
   runApp(
     MultiProvider(
@@ -46,7 +56,22 @@ class EstCovoitApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: const LoginScreen(),
+          home: StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.active) {
+                if (snapshot.hasData) {
+                  return const DashboardScreen();
+                } else {
+                  return const LoginScreen();
+                }
+              }
+              // Loading state while checking auth
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
+          ),
         );
       },
     );
