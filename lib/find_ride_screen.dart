@@ -56,7 +56,8 @@ class _FindRideScreenState extends State<FindRideScreen> {
         // Filter rides where the 'date' field is greater than or equal to the current date/time
         stream: FirebaseFirestore.instance
             .collection('rides')
-            .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now().subtract(const Duration(hours: 2))))
+            // Relaxed filter: Show rides from last 24 hours
+            .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 1))))
             .orderBy('date', descending: false)
             .snapshots(),
         builder: (context, snapshot) {
