@@ -41,16 +41,19 @@ dev_dependencies:
 
 flutter_native_splash:
   color: "#1565C0"
-  image: assets/app_icon.png
+  image: assets/transparent.png
   android_12:
-    image: assets/app_icon.png
+    image: assets/transparent.png
     color: "#1565C0"
+    icon_background_color: "#1565C0"
   
 
 flutter:
   uses-material-design: true
   assets:
     - assets/app_icon.png
+    - assets/splash.png
+    - assets/transparent.png
 
 # Config dyal l-icons
 flutter_launcher_icons:

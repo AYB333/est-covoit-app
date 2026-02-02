@@ -9,6 +9,7 @@ import 'notification_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'splash_screen.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -56,21 +57,23 @@ class EstCovoitApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: StreamBuilder<User?>(
-            stream: FirebaseAuth.instance.authStateChanges(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.active) {
-                if (snapshot.hasData) {
-                  return const DashboardScreen();
-                } else {
-                  return const LoginScreen();
+          home: SplashGate(
+            child: StreamBuilder<User?>(
+              stream: FirebaseAuth.instance.authStateChanges(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.active) {
+                  if (snapshot.hasData) {
+                    return const DashboardScreen();
+                  } else {
+                    return const LoginScreen();
+                  }
                 }
-              }
-              // Loading state while checking auth
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            },
+                // Loading state while checking auth
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              },
+            ),
           ),
         );
       },
