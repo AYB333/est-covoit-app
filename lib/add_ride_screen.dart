@@ -18,6 +18,7 @@ class AddRideScreen extends StatefulWidget {
 
 class _AddRideScreenState extends State<AddRideScreen> {
   static const LatLng _estAgadirLocation = LatLng(30.4061, -9.5790);
+  static const double _defaultZoom = 12.0;
   
   LatLng _selectedLocation = _estAgadirLocation;
   final MapController _mapController = MapController();
@@ -26,6 +27,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
   bool _isLoadingRoute = false;
 
   Future<void> _getCurrentLocation() async {
+    if (_isLoadingLocation) return;
     setState(() => _isLoadingLocation = true);
 
     bool serviceEnabled;
@@ -34,6 +36,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veuillez activer le GPS')));
+      await Geolocator.openLocationSettings();
       setState(() => _isLoadingLocation = false);
       return;
     }
@@ -48,19 +51,34 @@ class _AddRideScreenState extends State<AddRideScreen> {
     }
 
     if (permission == LocationPermission.deniedForever) {
+      await Geolocator.openAppSettings();
       setState(() => _isLoadingLocation = false);
       return;
     }
 
     try {
-      Position position = await Geolocator.getCurrentPosition();
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 10),
+        );
+      } catch (_) {
+        position = await Geolocator.getLastKnownPosition();
+      }
+
+      if (position == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Impossible de recuperer la position.')));
+        setState(() => _isLoadingLocation = false);
+        return;
+      }
+
       LatLng newPos = LatLng(position.latitude, position.longitude);
       _mapController.move(newPos, 16.0);
       setState(() {
-        _selectedLocation = newPos;
         _isLoadingLocation = false;
       });
-      _fetchRoute(newPos);
+      _handleMapTap(TapPosition(Offset.zero, Offset.zero), newPos);
     } catch (e) {
       setState(() => _isLoadingLocation = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur position: $e')));
@@ -73,13 +91,13 @@ class _AddRideScreenState extends State<AddRideScreen> {
       _routePoints.clear();
     });
 
-    final String osrmApiUrl = 'http://router.project-osrm.org/route/v1/driving/'
+    final String osrmApiUrl = 'https://router.project-osrm.org/route/v1/driving/'
         '${startPoint.longitude},${startPoint.latitude};'
         '${_estAgadirLocation.longitude},${_estAgadirLocation.latitude}'
-        '?overview=full&geometries=geojson';
+        '?overview=simplified&geometries=geojson';
 
     try {
-      final response = await http.get(Uri.parse(osrmApiUrl));
+      final response = await http.get(Uri.parse(osrmApiUrl)).timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -148,7 +166,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _selectedLocation,
-              initialZoom: 15.0,
+              initialZoom: _defaultZoom,
               onPositionChanged: (pos, hasGesture) {
                 // Removed to prevent marker from moving while dragging
               },

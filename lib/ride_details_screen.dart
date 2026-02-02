@@ -36,6 +36,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   List<LatLng> _routePoints = [];
   bool _isLoadingMap = false;
   bool _isLoadingPublish = false;
+  bool _isLoadingLocation = false;
 
   // Controllers
   final TextEditingController _departureAddressController = TextEditingController();
@@ -227,12 +228,56 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   }
 
   Future<void> _goToCurrentLocation() async {
+    if (_isLoadingLocation) return;
     try {
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      setState(() => _isLoadingLocation = true);
+
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showSnackBar('Veuillez activer le GPS', Colors.redAccent);
+        await Geolocator.openLocationSettings();
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied) {
+        _showSnackBar('Permission localisation refusee.', Colors.redAccent);
+        return;
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _showSnackBar('Permission localisation refusee. Activez-la dans les parametres.', Colors.redAccent);
+        await Geolocator.openAppSettings();
+        return;
+      }
+
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 10),
+        );
+      } catch (_) {
+        position = await Geolocator.getLastKnownPosition();
+      }
+
+      if (position == null) {
+        _showSnackBar('Impossible de recuperer la position.', Colors.redAccent);
+        return;
+      }
+
       LatLng loc = LatLng(position.latitude, position.longitude);
       _mapController.move(loc, 13.0);
       _handleMapTap(TapPosition(Offset.zero, Offset.zero), loc);
-    } catch (_) {}
+    } catch (e) {
+      _showSnackBar('Erreur position: $e', Colors.redAccent);
+    } finally {
+      if (mounted) setState(() => _isLoadingLocation = false);
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -438,7 +483,9 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         child: FloatingActionButton(
           onPressed: _goToCurrentLocation,
           backgroundColor: Colors.white,
-          child: const Icon(Icons.my_location, color: Colors.blue),
+          child: _isLoadingLocation
+              ? const CircularProgressIndicator(color: Colors.blue)
+              : const Icon(Icons.my_location, color: Colors.blue),
         ),
       ),
       appBar: AppBar(
@@ -452,7 +499,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: widget.startLocation,
-              initialZoom: 13.0,
+              initialZoom: _pickedLocation == null ? 12.0 : 13.0,
               onTap: _handleMapTap,
             ),
             children: [

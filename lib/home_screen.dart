@@ -345,7 +345,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 color: count > 0 ? Colors.blue[900] : null
                               )
                             ),
-                            onPressed: () => _showRequestsModal(context, rideDoc.id, seats),
+                            onPressed: () => _showRequestsModal(context, rideDoc.id),
                           );
                         }
                       ),
@@ -594,7 +594,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (ctx) => AlertDialog(
         title: Text(isAccepted ? "Supprimer" : "Annuler"),
         content: Text(isAccepted 
-          ? "Voulez-vous vraiment annuler cette réservation ?\nLe conducteur sera notifié." 
+          ? "Voulez-vous vraiment annuler cette reservation ?\nLe conducteur sera notifie."
           : "Voulez-vous annuler cette demande ?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Retour")),
@@ -611,42 +611,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (confirm != true) return;
 
     try {
-      final doc = await FirebaseFirestore.instance.collection('bookings').doc(bookingId).get();
+      final bookingRef = FirebaseFirestore.instance.collection('bookings').doc(bookingId);
+      final doc = await bookingRef.get();
       if (!doc.exists) return;
       
       final data = doc.data() as Map<String, dynamic>;
       final String rideId = data['rideId'];
       final String driverId = data['driverId'];
       final String passengerName = data['passengerName'] ?? 'Un passager';
+      final String status = data['status'] ?? 'pending';
+      final bool wasAccepted = status == 'accepted';
 
-      // If accepted, restore seat & notify driver
-      if (isAccepted) {
-        // Restore seat
-        await FirebaseFirestore.instance.collection('rides').doc(rideId).update({
-          'seats': FieldValue.increment(1)
+      if (wasAccepted) {
+        final rideRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
+        await FirebaseFirestore.instance.runTransaction((transaction) async {
+          final rideSnap = await transaction.get(rideRef);
+          if (rideSnap.exists) {
+            transaction.update(rideRef, {'seats': FieldValue.increment(1)});
+          }
+          transaction.delete(bookingRef);
         });
 
         // Notify Driver
         NotificationService.sendNotification(
           receiverId: driverId,
-          title: "Annulation Réservation",
-          body: "$passengerName a annulé sa réservation.",
+          title: "Annulation Reservation",
+          body: "$passengerName a annule sa reservation.",
           type: "booking_cancel",
         );
+      } else {
+        await bookingRef.delete();
       }
 
-      // Delete the booking document
-      await FirebaseFirestore.instance.collection('bookings').doc(bookingId).delete();
-      
       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Réservation annulée/supprimée.")));
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Reservation annulee/supprimee.")));
       }
 
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
     }
   }
-
   void _deleteRide(String rideId) async {
     final bool? confirm = await showDialog<bool>(
       context: context, 
@@ -701,7 +705,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // --- LOGIC: Driver Requests Modal ---
-  void _showRequestsModal(BuildContext context, String rideId, int currentSeats) {
+  void _showRequestsModal(BuildContext context, String rideId) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -784,12 +788,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 if (status == 'pending') ...[
                                   IconButton(
                                     icon: const Icon(Icons.check_circle, color: Colors.green, size: 30),
-                                    onPressed: () => _handleBooking(req.id, rideId, true, currentSeats, rData['passengerId']),
+                                    onPressed: () => _handleBooking(req.id, rideId, true, rData['passengerId']),
                                     tooltip: "Accepter",
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.cancel, color: Colors.red, size: 30),
-                                    onPressed: () => _handleBooking(req.id, rideId, false, currentSeats, rData['passengerId']),
+                                    onPressed: () => _handleBooking(req.id, rideId, false, rData['passengerId']),
                                     tooltip: "Refuser",
                                   ),
                                 ] else if (status == 'accepted') ...[
@@ -827,40 +831,96 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> _handleBooking(String bookingId, String rideId, bool accept, int currentSeats, String passengerId) async {
+  Future<void> _handleBooking(String bookingId, String rideId, bool accept, String passengerId) async {
     if (accept) {
-      if (currentSeats <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Plus de places disponibles !")));
-        return;
-      }
-      // Update Booking
-      await FirebaseFirestore.instance.collection('bookings').doc(bookingId).update({'status': 'accepted'});
-      // Decrement Seats
-      await FirebaseFirestore.instance.collection('rides').doc(rideId).update({'seats': FieldValue.increment(-1)});
-      
-      // Notify Passenger
-      NotificationService.sendNotification(
-        receiverId: passengerId,
-        title: "Réservation Acceptée !",
-        body: "Le conducteur a accepté votre demande.",
-        type: "booking_status",
-      );
+      try {
+        final rideRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
+        final bookingRef = FirebaseFirestore.instance.collection('bookings').doc(bookingId);
 
-      if (mounted) Navigator.pop(context); // Close modal to refresh seats
+        await FirebaseFirestore.instance.runTransaction((transaction) async {
+          final rideSnap = await transaction.get(rideRef);
+          if (!rideSnap.exists) throw StateError('ride-missing');
+
+          final bookingSnap = await transaction.get(bookingRef);
+          if (!bookingSnap.exists) throw StateError('booking-missing');
+
+          final bookingData = bookingSnap.data() as Map<String, dynamic>;
+          final status = bookingData['status'] ?? 'pending';
+          if (status != 'pending') throw StateError('booking-not-pending');
+
+          final seats = (rideSnap.data()?['seats'] as num?)?.toInt() ?? 0;
+          if (seats <= 0) throw StateError('no-seats');
+
+          transaction.update(bookingRef, {
+            'status': 'accepted',
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          transaction.update(rideRef, {'seats': seats - 1});
+        });
+        
+        // Notify Passenger
+        NotificationService.sendNotification(
+          receiverId: passengerId,
+          title: "Reservation acceptee !",
+          body: "Le conducteur a accepte votre demande.",
+          type: "booking_status",
+        );
+
+        if (mounted) Navigator.pop(context); // Close modal to refresh seats
+      } catch (e) {
+        String message = "Erreur: $e";
+        if (e is StateError) {
+          switch (e.message) {
+            case 'no-seats':
+              message = "Plus de places disponibles !";
+              break;
+            case 'booking-not-pending':
+              message = "Demande deja traitee.";
+              break;
+            case 'ride-missing':
+              message = "Trajet introuvable.";
+              break;
+            default:
+              message = "Erreur traitement.";
+          }
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        }
+      }
     } else {
-      await FirebaseFirestore.instance.collection('bookings').doc(bookingId).update({'status': 'rejected'});
-      
-      // Notify Passenger
-      NotificationService.sendNotification(
-        receiverId: passengerId,
-        title: "Réservation Refusée",
-        body: "Le conducteur a refusé votre demande.",
-        type: "booking_status",
-      );
+      try {
+        final bookingRef = FirebaseFirestore.instance.collection('bookings').doc(bookingId);
+        final bookingSnap = await bookingRef.get();
+        if (!bookingSnap.exists) return;
+
+        final bookingData = bookingSnap.data() as Map<String, dynamic>;
+        final status = bookingData['status'] ?? 'pending';
+        if (status != 'pending') {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Demande deja traitee.")));
+          }
+          return;
+        }
+
+        await bookingRef.update({
+          'status': 'rejected',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        
+        // Notify Passenger
+        NotificationService.sendNotification(
+          receiverId: passengerId,
+          title: "Reservation refusee",
+          body: "Le conducteur a refuse votre demande.",
+          type: "booking_status",
+        );
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+      }
     }
   }
-
-  // --- TAB 3: SETTINGS ---
+// --- TAB 3: SETTINGS ---
   Widget _buildSettingsView() {
     // SettingsScreen deja 3ndou Scaffold w AppBar dyalo, donc kan3ytou lih nichan
     return const SettingsScreen(); 
@@ -960,3 +1020,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 }
+
+
+

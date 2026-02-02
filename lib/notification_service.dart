@@ -5,10 +5,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'dart:convert';
-import 'package:flutter/services.dart';
-import 'package:googleapis_auth/auth_io.dart';
-import 'package:http/http.dart' as http;
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -167,76 +163,6 @@ class NotificationService {
       'read': false,
       'timestamp': FieldValue.serverTimestamp(),
     });
-    
-    // --- SEND PUSH NOTIFICATION (FCM) ---
-    try {
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(receiverId).get();
-      if (userDoc.exists && userDoc.data() != null) {
-        final data = userDoc.data() as Map<String, dynamic>;
-        final String? fcmToken = data['fcmToken'];
-        
-        if (fcmToken != null && fcmToken.isNotEmpty) {
-           await _sendPushNotification(
-             token: fcmToken,
-             title: title,
-             body: body,
-             type: type,
-           );
-        }
-      }
-    } catch (e) {
-      print("Error sending push: $e");
-    }
-  }
-
-  static Future<void> _sendPushNotification({
-    required String token, 
-    required String title, 
-    required String body,
-    required String type,
-  }) async {
-    try {
-      // 1. Load Service Account JSON
-      final jsonString = await rootBundle.loadString('assets/service_account.json');
-      final serviceAccount = json.decode(jsonString);
-      final String projectId = serviceAccount['project_id'];
-
-      // 2. Get Access Token scope
-      final accountCredentials = ServiceAccountCredentials.fromJson(serviceAccount);
-      final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
-      
-      final client = await clientViaServiceAccount(accountCredentials, scopes);
-      
-      // 3. Send Request
-      final url = 'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
-      
-      final notificationData = {
-        'message': {
-          'token': token,
-          'notification': {
-            'title': title,
-            'body': body,
-          },
-          'data': {
-            'type': type,
-            'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-          }
-        }
-      };
-
-      final response = await client.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(notificationData),
-      );
-
-      print("FCM Response: ${response.statusCode} ${response.body}");
-      client.close();
-      
-    } catch (e) {
-      print("Failed to send FCM: $e");
-    }
+    // Push disabled (free plan). Firestore + local notifications only.
   }
 }

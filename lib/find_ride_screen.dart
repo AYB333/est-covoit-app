@@ -7,7 +7,7 @@ import 'ride_map_viewer.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'user_avatar.dart';
 import 'translations.dart';
-import 'notification_service.dart';
+import 'booking_service.dart';
 
 
 class FindRideScreen extends StatefulWidget {
@@ -418,53 +418,18 @@ class _FindRideScreenState extends State<FindRideScreen> {
 
     if (confirm != true) return;
 
-    try {
-      // Check if already reserved
-      final existing = await FirebaseFirestore.instance
-          .collection('bookings')
-          .where('rideId', isEqualTo: rideId)
-          .where('passengerId', isEqualTo: user.uid)
-          .limit(1)
-          .get();
+    final result = await BookingService.reserveRide(
+      user: user,
+      rideId: rideId,
+      rideData: rideData,
+    );
 
-      if (existing.docs.isNotEmpty) {
-        if (!context.mounted) return;
-        _showSnackBar(context, "Vous avez déjà réservé ce trajet.", Colors.orange);
-        return;
-      }
-
-      // Add Booking
-      await FirebaseFirestore.instance.collection('bookings').add({
-        'rideId': rideId,
-        'driverId': rideData['driverId'],
-        'passengerId': user.uid,
-        'passengerName': user.displayName ?? user.email?.split('@')[0] ?? 'Passager',
-        'passengerPhotoUrl': user.photoURL,
-        'status': 'pending', // pending, accepted, rejected
-        'timestamp': FieldValue.serverTimestamp(),
-        'rideDestination': rideData['destinationName'] ?? 'EST Agadir',
-        'rideDate': rideData['date'],
-        'ridePrice': rideData['price'],
-        'driverName': rideData['driverName'],
-        'driverPhotoUrl': rideData['driverPhotoUrl'],
-        'driverPhone': rideData['phone'], // Stored so passenger can see it IF accepted
-        'departureAddress': rideData['departureAddress'],
-      });
-
-      // Notify Driver
-      NotificationService.sendNotification(
-        receiverId: rideData['driverId'],
-        title: "Nouvelle Réservation !",
-        body: "${user.displayName ?? 'Un passager'} a réservé une place.",
-        type: "booking_request",
-      );
-
-      if (!context.mounted) return;
-      _showSnackBar(context, "Demande envoyée ! Vérifiez 'Mes Trajets'.", Colors.green);
-
-    } catch (e) {
-      if (!context.mounted) return;
-      _showSnackBar(context, "Erreur: $e", Colors.red);
-    }
+    if (!context.mounted) return;
+    final Color color = switch (result.status) {
+      BookingCreateStatus.success => Colors.green,
+      BookingCreateStatus.alreadyExists => Colors.orange,
+      _ => Colors.red,
+    };
+    _showSnackBar(context, result.message, color);
   }
 }

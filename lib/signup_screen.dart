@@ -4,6 +4,7 @@ import 'user_avatar.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -16,6 +17,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _nameController = TextEditingController(); // Hada dyal Smiya
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _phoneController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
   File? _selectedImage;
@@ -33,7 +35,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Future<void> _signUp() async {
     if (_nameController.text.isEmpty || 
         _emailController.text.isEmpty || 
-        _passwordController.text.isEmpty) {
+        _passwordController.text.isEmpty ||
+        _phoneController.text.isEmpty) {
       _showError("Veuillez remplir tous les champs.");
       return;
     }
@@ -81,7 +84,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
         displayName: _nameController.text.trim(),
         photoURL: photoUrl
       );
-      await userCredential.user?.reload(); // Bach t-validé dghya
+      await userCredential.user?.reload();
+
+      // 4. Save phone number to Firestore
+      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+        'phoneNumber': _phoneController.text.trim(),
+      }, SetOptions(merge: true));
 
       // 3. Afficher Message Vert u Rje3 l Login
       if (!mounted) return;
@@ -134,6 +142,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Créer un compte")),
@@ -182,7 +199,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 },
               ),
               const SizedBox(height: 30),
-              
+
               // Champs Full Name
               TextField(
                 controller: _nameController,
@@ -220,6 +237,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 20),
+
+              // Champs Telephone
+              TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: 'Téléphone',
+                  prefixIcon: const Icon(Icons.phone),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
               const SizedBox(height: 30),
 
               SizedBox(
@@ -244,3 +273,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 }
+
+
+
+
+
+
