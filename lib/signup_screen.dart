@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'user_avatar.dart';
 import 'dart:io';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'user_avatar.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -14,7 +15,7 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  final _nameController = TextEditingController(); // Hada dyal Smiya
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -33,8 +34,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Future<void> _signUp() async {
-    if (_nameController.text.isEmpty || 
-        _emailController.text.isEmpty || 
+    if (_nameController.text.isEmpty ||
+        _emailController.text.isEmpty ||
         _passwordController.text.isEmpty ||
         _phoneController.text.isEmpty) {
       _showError("Veuillez remplir tous les champs.");
@@ -42,56 +43,44 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
 
     if (!_emailController.text.trim().endsWith("@edu.uiz.ac.ma")) {
-      _showError("Veuillez utiliser votre email académique (@edu.uiz.ac.ma).");
+      _showError("Veuillez utiliser votre email academique (@edu.uiz.ac.ma).");
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // 1. Créer le compte b Email/Password
       UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // 2. Upload Image if selected
       String? photoUrl;
       if (_selectedImage != null) {
         try {
-          final ref = FirebaseStorage.instance
-              .ref()
-              .child('profile_images/${userCredential.user!.uid}.jpg');
-          
+          final ref = FirebaseStorage.instance.ref().child('profile_images/${userCredential.user!.uid}.jpg');
           final metadata = SettableMetadata(contentType: 'image/jpeg');
           final uploadTask = ref.putFile(_selectedImage!, metadata);
-          
           final snapshot = await uploadTask.whenComplete(() => null);
-
           if (snapshot.state == TaskState.success) {
-             // Delay to ensure consistency
-             await Future.delayed(const Duration(milliseconds: 500));
-             photoUrl = await snapshot.ref.getDownloadURL();
+            await Future.delayed(const Duration(milliseconds: 500));
+            photoUrl = await snapshot.ref.getDownloadURL();
           }
-        } catch (e) {
-          debugPrint("Erreur upload image au signup: $e");
-          // On continue même si l'image échoue pour ne pas bloquer l'inscription
+        } catch (_) {
+          // Keep going if upload fails.
         }
       }
 
-      // 3. SAUVEGARDER S-SMIYA & PHOTO (Update Profile)
       await userCredential.user?.updateProfile(
         displayName: _nameController.text.trim(),
-        photoURL: photoUrl
+        photoURL: photoUrl,
       );
       await userCredential.user?.reload();
 
-      // 4. Save phone number to Firestore
       await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
         'phoneNumber': _phoneController.text.trim(),
       }, SetOptions(merge: true));
 
-      // 3. Afficher Message Vert u Rje3 l Login
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -99,7 +88,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             children: [
               Icon(Icons.check_circle, color: Colors.white),
               SizedBox(width: 10),
-              Expanded(child: Text("Compte créé ! Connectez-vous.", style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(child: Text("Compte cree ! Connectez-vous.", style: TextStyle(fontWeight: FontWeight.bold))),
             ],
           ),
           backgroundColor: Colors.green,
@@ -109,17 +98,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
         ),
       );
 
-      // Tsenna tanya u rje3 l Login
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return;
-      Navigator.pop(context); // Rje3 l Login
-
+      Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       String message = "Erreur d'inscription.";
       if (e.code == 'email-already-in-use') {
-        message = "Cet email est déjà utilisé.";
+        message = "Cet email est deja utilise.";
       } else if (e.code == 'weak-password') {
-        message = "Mot de passe trop faible (min 6 caractères).";
+        message = "Mot de passe trop faible (min 6 caracteres).";
       } else if (e.code == 'invalid-email') {
         message = "Email invalide.";
       }
@@ -152,130 +139,174 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Créer un compte")),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            children: [
-              // Dynamic Avatar Preview
-              AnimatedBuilder(
-                animation: _nameController,
-                builder: (context, _) {
-                  return GestureDetector(
-                    onTap: _pickImage,
-                    child: Stack(
-                      alignment: Alignment.bottomRight,
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [scheme.primary, scheme.secondary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          Positioned(
+            top: -70,
+            left: -40,
+            child: Container(
+              height: 180,
+              width: 180,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    child: Column(
                       children: [
-                        _selectedImage != null
-                          ? CircleAvatar(
-                              radius: 50,
-                              backgroundImage: FileImage(_selectedImage!),
-                              backgroundColor: Colors.grey[200],
-                            )
-                          : UserAvatar(
-                              userName: _nameController.text.isEmpty ? "Nouveau" : _nameController.text,
-                              radius: 50,
-                              backgroundColor: Colors.blue[50],
-                              textColor: Colors.blue,
-                              fontSize: 40,
+                        Text('Creer un compte', style: textTheme.displaySmall?.copyWith(color: Colors.white)),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Rejoignez la communaute EST',
+                          style: textTheme.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.85)),
+                        ),
+                        const SizedBox(height: 24),
+                        Card(
+                          margin: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              children: [
+                                AnimatedBuilder(
+                                  animation: _nameController,
+                                  builder: (context, _) {
+                                    return GestureDetector(
+                                      onTap: _pickImage,
+                                      child: Stack(
+                                        alignment: Alignment.bottomRight,
+                                        children: [
+                                          _selectedImage != null
+                                              ? CircleAvatar(
+                                                  radius: 46,
+                                                  backgroundImage: FileImage(_selectedImage!),
+                                                  backgroundColor: Colors.grey[200],
+                                                )
+                                              : UserAvatar(
+                                                  userName: _nameController.text.isEmpty
+                                                      ? "Nouveau"
+                                                      : _nameController.text,
+                                                  radius: 46,
+                                                  backgroundColor: scheme.surfaceVariant,
+                                                  textColor: scheme.primary,
+                                                  fontSize: 36,
+                                                ),
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: scheme.primary,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(
+                                              _selectedImage == null ? Icons.add : Icons.edit,
+                                              color: Colors.white,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 24),
+                                TextField(
+                                  controller: _nameController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Nom complet',
+                                    prefixIcon: Icon(Icons.person_outline),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: _emailController,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Email',
+                                    prefixIcon: Icon(Icons.email_outlined),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: _passwordController,
+                                  obscureText: _obscurePassword,
+                                  decoration: InputDecoration(
+                                    labelText: 'Mot de passe',
+                                    prefixIcon: const Icon(Icons.lock_outline),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: _phoneController,
+                                  keyboardType: TextInputType.phone,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Telephone',
+                                    prefixIcon: Icon(Icons.phone),
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 52,
+                                  child: ElevatedButton(
+                                    onPressed: _isLoading ? null : _signUp,
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            height: 22,
+                                            width: 22,
+                                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                          )
+                                        : const Text("S'inscrire"),
+                                  ),
+                                ),
+                              ],
                             ),
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.blue,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _selectedImage == null ? Icons.add : Icons.edit, 
-                            color: Colors.white, 
-                            size: 20
                           ),
                         ),
+                        const SizedBox(height: 16),
                       ],
                     ),
-                  );
-                },
-              ),
-              const SizedBox(height: 30),
-
-              // Champs Full Name
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Nom Complet',
-                  prefixIcon: const Icon(Icons.person_outline),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Champs Email
-              TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: const Icon(Icons.email_outlined),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Champs Password
-              TextField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  labelText: 'Mot de passe',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              // Champs Telephone
-              TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: 'Téléphone',
-                  prefixIcon: const Icon(Icons.phone),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 30),
-
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _signUp,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: _isLoading 
-                    ? const CircularProgressIndicator(color: Colors.white) 
-                    : const Text('S\'inscrire', style: TextStyle(fontSize: 18)),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
-
-
-
-
-
-

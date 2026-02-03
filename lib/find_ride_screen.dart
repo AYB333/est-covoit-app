@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
 import 'ride_map_viewer.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'user_avatar.dart';
@@ -35,11 +34,28 @@ class _FindRideScreenState extends State<FindRideScreen> {
   @override
   Widget build(BuildContext context) {
     final LatLng? pickup = widget.userPickupLocation;
+    final scheme = Theme.of(context).colorScheme;
 
     if (pickup == null) {
-      return  Scaffold(
-        appBar: AppBar(title: Text(Translations.getText(context, 'available_trips'))),
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(Translations.getText(context, 'available_trips')),
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: true,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [scheme.primary, scheme.secondary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -49,8 +65,20 @@ class _FindRideScreenState extends State<FindRideScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(Translations.getText(context, 'available_trips')),
-        backgroundColor: Colors.blue[700],
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [scheme.primary, scheme.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       body: StreamBuilder<QuerySnapshot>(
         // Filter rides where the 'date' field is greater than or equal to the current date/time
@@ -200,8 +228,8 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                         userName: driverName,
                                         imageUrl: data['driverPhotoUrl'],
                                         radius: 20,
-                                        backgroundColor: Colors.blue[100],
-                                        textColor: Colors.blue[800],
+                                        backgroundColor: scheme.primary.withOpacity(0.12),
+                                        textColor: scheme.primary,
                                       ),
                                       const SizedBox(width: 10),
                                       Column(
@@ -229,13 +257,13 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: Colors.green[50],
+                                      color: scheme.secondary.withOpacity(0.12),
                                       borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                                      border: Border.all(color: scheme.secondary.withOpacity(0.35)),
                                     ),
                                     child: Text(
                                       '$price MAD',
-                                      style: TextStyle(color: Colors.green[800], fontWeight: FontWeight.bold, fontSize: 16),
+                                      style: TextStyle(color: scheme.secondary, fontWeight: FontWeight.bold, fontSize: 16),
                                     ),
                                   ),
                                 ],
@@ -257,7 +285,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 10),
-                                    child: Icon(Icons.arrow_forward, color: Colors.blue[300]),
+                                    child: Icon(Icons.arrow_forward, color: scheme.primary.withOpacity(0.6)),
                                   ),
                                   Expanded(
                                     child: Column(
@@ -325,8 +353,8 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                       icon: const Icon(Icons.map, size: 18),
                                       label: const Text("Voir Carte"),
                                       style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.blue,
-                                        side: const BorderSide(color: Colors.blue),
+                                        foregroundColor: scheme.primary,
+                                        side: BorderSide(color: scheme.primary),
                                       ),
                                     ),
                                   ),
@@ -340,9 +368,9 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                         icon: const Icon(Icons.bookmark_add, size: 18),
                                         label: const Text("Réserver"),
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.blue[700],
+                                          backgroundColor: scheme.primary,
                                           foregroundColor: Colors.white,
-                                          disabledBackgroundColor: Colors.grey[300],
+                                          disabledBackgroundColor: scheme.surfaceVariant,
                                         ),
                                       ),
                                     ),
@@ -425,10 +453,11 @@ class _FindRideScreenState extends State<FindRideScreen> {
     );
 
     if (!context.mounted) return;
+    final scheme = Theme.of(context).colorScheme;
     final Color color = switch (result.status) {
-      BookingCreateStatus.success => Colors.green,
-      BookingCreateStatus.alreadyExists => Colors.orange,
-      _ => Colors.red,
+      BookingCreateStatus.success => scheme.secondary,
+      BookingCreateStatus.alreadyExists => scheme.tertiary,
+      _ => scheme.error,
     };
     _showSnackBar(context, result.message, color);
   }

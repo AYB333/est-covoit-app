@@ -60,6 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     final languageService = context.watch<LanguageService>();
+    final scheme = Theme.of(context).colorScheme;
     final isDarkMode = themeService.isDarkMode;
     final currentLanguage = languageService.currentLanguage;
     final languageNames = Translations.getLanguageNames();
@@ -67,8 +68,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(Translations.getText(context, 'settings_title')),
-        backgroundColor: Colors.blue[800],
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [scheme.primary, scheme.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: ListView(
@@ -132,7 +145,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.language, color: Colors.blue),
+                          Icon(Icons.language, color: scheme.primary),
                           const SizedBox(width: 12),
                           Text(
                             Translations.getText(context, 'language'),
@@ -146,7 +159,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         isExpanded: true,
                         underline: Container(
                           height: 2,
-                          color: Colors.blue[800],
+                          color: scheme.primary,
                         ),
                         items: [
                           for (var entry in languageNames.entries)
@@ -184,7 +197,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             child: ListTile(
-              leading: const Icon(Icons.edit, color: Colors.blue),
+              leading: Icon(Icons.edit, color: scheme.primary),
               title: Text(
                 Translations.getText(context, 'edit_profile'),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -217,7 +230,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.headset_mic, color: Colors.blue),
+                  leading: Icon(Icons.headset_mic, color: scheme.primary),
                   title: Text(
                     Translations.getText(context, 'contact_support'),
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -227,7 +240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: const Text('Support: Envoyez un email à aitomghar26@gmail.com'),
-                        backgroundColor: Colors.blue,
+                        backgroundColor: scheme.primary,
                         behavior: SnackBarBehavior.floating,
                         margin: const EdgeInsets.all(16),
                       ),
@@ -239,7 +252,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   height: 1,
                 ),
                 ListTile(
-                  leading: const Icon(Icons.info, color: Colors.blue),
+                  leading: Icon(Icons.info, color: scheme.primary),
                   title: Text(
                     Translations.getText(context, 'about'),
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -282,6 +295,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Helper widget to create section headers
   Widget _buildSectionHeader(String title) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, left: 4),
       child: Text(
@@ -289,7 +303,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: Colors.blue[800],
+          color: scheme.primary,
           letterSpacing: 0.5,
         ),
       ),

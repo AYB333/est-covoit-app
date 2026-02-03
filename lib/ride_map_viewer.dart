@@ -77,16 +77,19 @@ class _RideMapViewerState extends State<RideMapViewer> {
     );
 
     if (!context.mounted) return;
+    final scheme = Theme.of(context).colorScheme;
     final Color color = switch (result.status) {
-      BookingCreateStatus.success => Colors.green,
-      BookingCreateStatus.alreadyExists => Colors.orange,
-      _ => Colors.red,
+      BookingCreateStatus.success => scheme.secondary,
+      BookingCreateStatus.alreadyExists => scheme.tertiary,
+      _ => scheme.error,
     };
     _showSnackBar(result.message, color);
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     LatLng? startPoint;
     if (widget.polylinePoints.isNotEmpty) {
       startPoint = widget.polylinePoints.first;
@@ -102,8 +105,8 @@ class _RideMapViewerState extends State<RideMapViewer> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Trajet de ${widget.driverName}'),
-        backgroundColor: Colors.blue[700],
-        foregroundColor: Colors.white,
+        backgroundColor: scheme.surface,
+        foregroundColor: scheme.onSurface,
       ),
       body: Stack(
         children: [
@@ -119,7 +122,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
                   polylines: [
                     Polyline(
                       points: widget.polylinePoints,
-                      color: Colors.blue,
+                      color: scheme.primary,
                       strokeWidth: 5.0,
                     ),
                   ],
@@ -131,13 +134,13 @@ class _RideMapViewerState extends State<RideMapViewer> {
                       point: startPoint,
                       width: 80,
                       height: 80,
-                      child: const Icon(Icons.location_on, color: Colors.green, size: 40),
+                      child: Icon(Icons.location_on, color: scheme.secondary, size: 40),
                     ),
                   Marker(
                     point: _estAgadirLocation,
                     width: 80,
                     height: 80,
-                    child: const Icon(Icons.school, color: Colors.red, size: 40),
+                    child: Icon(Icons.school, color: scheme.tertiary, size: 40),
                   ),
                 ],
               ),
@@ -158,7 +161,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
                   children: [
                     Text(
                       'Conducteur: ${widget.driverName}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: scheme.primary),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -181,7 +184,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: seats > 0 ? Colors.blue[700] : Colors.grey,
+                            backgroundColor: seats > 0 ? scheme.primary : scheme.surfaceVariant,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),

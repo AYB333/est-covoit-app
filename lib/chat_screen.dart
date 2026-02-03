@@ -120,6 +120,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: StreamBuilder<DocumentSnapshot>(
@@ -156,12 +157,12 @@ class _ChatScreenState extends State<ChatScreen> {
                           userName: name,
                           imageUrl: photoUrl,
                           radius: 18,
-                          backgroundColor: Colors.white24,
-                          textColor: Colors.white,
+                          backgroundColor: scheme.primary.withOpacity(0.18),
+                  textColor: scheme.onPrimary,
                           fontSize: 14,
                         ),
                         const SizedBox(width: 10),
-                        Text(name, style: const TextStyle(fontSize: 18)),
+                        Text(name, style: const TextStyle(fontSize: 18, color: Colors.white)),
                       ],
                     );
                    }
@@ -175,19 +176,30 @@ class _ChatScreenState extends State<ChatScreen> {
                   userName: name,
                   imageUrl: photoUrl,
                   radius: 18,
-                  backgroundColor: Colors.white24,
-                  textColor: Colors.white,
+                  backgroundColor: scheme.primary.withOpacity(0.18),
+                  textColor: scheme.onPrimary,
                   fontSize: 14,
                 ),
                 const SizedBox(width: 10),
-                Text(name, style: const TextStyle(fontSize: 18)),
+                Text(name, style: const TextStyle(fontSize: 18, color: Colors.white)),
               ],
             );
           }
         ),
-        backgroundColor: Colors.blue[800],
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
-        elevation: 2,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [scheme.primary, scheme.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.phone),
@@ -196,7 +208,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
       body: Container(
-        color: const Color(0xFFF2F5F8), // Light Chat Background
+        color: scheme.background, // Light Chat Background
         child: Column(
           children: [
             Expanded(
@@ -256,7 +268,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
                             decoration: BoxDecoration(
                               gradient: isMe 
-                                  ? LinearGradient(colors: [Colors.blue[700]!, Colors.blue[500]!], begin: Alignment.topLeft, end: Alignment.bottomRight)
+                                  ? LinearGradient(colors: [scheme.primary, scheme.secondary], begin: Alignment.topLeft, end: Alignment.bottomRight)
                                   : null,
                               color: isMe ? null : Colors.white,
                               boxShadow: [
@@ -276,7 +288,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 Text(
                                   text,
                                   style: TextStyle(
-                                    color: isMe ? Colors.white : Colors.black87,
+                                    color: isMe ? Colors.white : scheme.onSurface,
                                     fontSize: 16,
                                   ),
                                 ),
@@ -287,7 +299,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                     Text(
                                       time,
                                       style: TextStyle(
-                                        color: isMe ? Colors.white70 : Colors.grey[500],
+                                        color: isMe ? Colors.white70 : scheme.onSurfaceVariant,
                                         fontSize: 10,
                                       ),
                                     ),
@@ -312,7 +324,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               padding: const EdgeInsets.fromLTRB(10, 10, 10, 15),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: scheme.surface,
                 boxShadow: [
                   BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 10, offset: const Offset(0, -2))
                 ],
@@ -322,17 +334,17 @@ class _ChatScreenState extends State<ChatScreen> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: scheme.surfaceVariant,
                         borderRadius: BorderRadius.circular(25),
-                        border: Border.all(color: Colors.grey[300]!),
+                        border: Border.all(color: scheme.outline),
                       ),
                       child: TextField(
                         controller: _messageController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: "Écrire un message...",
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          hintStyle: TextStyle(color: Colors.grey),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          hintStyle: TextStyle(color: scheme.onSurfaceVariant),
                         ),
                         textCapitalization: TextCapitalization.sentences,
                         onSubmitted: (_) => _sendMessage(),
@@ -344,8 +356,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     onTap: _sendMessage,
                     child: CircleAvatar(
                       radius: 24,
-                      backgroundColor: Colors.blue[700],
-                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 22),
+                      backgroundColor: scheme.primary,
+                      child: Icon(Icons.send_rounded, color: scheme.onPrimary, size: 22),
                     ),
                   ),
                 ],

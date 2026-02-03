@@ -151,14 +151,27 @@ class _AddRideScreenState extends State<AddRideScreen> {
   @override
   Widget build(BuildContext context) {
     final String appBarTitle = widget.isDriver ? "Point de départ" : "Trajet vers EST";
-    final String buttonText = widget.isDriver ? "Confirmer le départ" : "Chercher";
-    final Color buttonColor = widget.isDriver ? Colors.blue[800]! : Colors.green[600]!;
+    final String buttonText = widget.isDriver ? "Confirmer le depart" : "Chercher";
+    final scheme = Theme.of(context).colorScheme;
+    final Color buttonColor = widget.isDriver ? scheme.primary : scheme.secondary;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(appBarTitle),
-        backgroundColor: Colors.blue[700],
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [scheme.primary, scheme.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       body: Stack(
         children: [
@@ -183,7 +196,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
                   polylines: [
                     Polyline(
                       points: _routePoints,
-                      color: Colors.blue,
+                      color: scheme.primary,
                       strokeWidth: 4.0,
                     ),
                   ],
@@ -199,13 +212,13 @@ class _AddRideScreenState extends State<AddRideScreen> {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        const Icon(Icons.location_on, color: Colors.red, size: 40),
+                        Icon(Icons.location_on, color: scheme.tertiary, size: 40),
                         Positioned(
                           bottom: 35,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.8),
+                              color: scheme.tertiary.withOpacity(0.8),
                               borderRadius: BorderRadius.circular(5),
                             ),
                             child: const Text(
@@ -226,13 +239,13 @@ class _AddRideScreenState extends State<AddRideScreen> {
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          const Icon(Icons.location_on, color: Colors.green, size: 40),
+                          Icon(Icons.location_on, color: scheme.secondary, size: 40),
                           Positioned(
                             bottom: 35,
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.8),
+                                color: scheme.secondary.withOpacity(0.8),
                                 borderRadius: BorderRadius.circular(5),
                               ),
                               child: const Text(
@@ -257,8 +270,8 @@ class _AddRideScreenState extends State<AddRideScreen> {
               backgroundColor: Colors.white,
               onPressed: _getCurrentLocation,
               child: _isLoadingLocation
-                  ? const CircularProgressIndicator(color: Colors.blue)
-                  : const Icon(Icons.my_location, color: Colors.blue),
+                  ? CircularProgressIndicator(color: scheme.primary)
+                  : Icon(Icons.my_location, color: scheme.primary),
             ),
           ),
 

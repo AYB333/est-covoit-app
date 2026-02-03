@@ -312,6 +312,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   }
 
   void _showRideDetailsForm() {
+    final scheme = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -336,7 +337,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                   children: [
                     Text(
                       _isEditing ? 'Modifier le trajet' : 'Confirmer les détails du trajet', 
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue[800]), 
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: scheme.primary), 
                       textAlign: TextAlign.center
                     ),
                     const SizedBox(height: 20),
@@ -347,12 +348,12 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                       children: [
                         Expanded(child: RadioListTile<String>(
                           title: const Text('Voiture'), value: 'Voiture', groupValue: _selectedVehicle,
-                          activeColor: Colors.deepPurple,
+                          activeColor: scheme.primary,
                           onChanged: (val) => update(() { _selectedVehicle = val!; _updatePriceBounds(); })
                         )),
                         Expanded(child: RadioListTile<String>(
                           title: const Text('Moto'), value: 'Moto', groupValue: _selectedVehicle,
-                          activeColor: Colors.deepPurple,
+                          activeColor: scheme.primary,
                           onChanged: (val) => update(() { _selectedVehicle = val!; _updatePriceBounds(); })
                         )),
                       ],
@@ -363,12 +364,12 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                          icon: Icon(Icons.remove_circle_outline, color: scheme.error),
                           onPressed: _price > _minPrice ? () => update(() => _price = (_price - _priceStep).clamp(_minPrice, _maxPrice)) : null
                         ),
                         Expanded(child: Center(child: Text('${_price.toStringAsFixed(1)} MAD', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)))),
                         IconButton(
-                          icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                          icon: Icon(Icons.add_circle_outline, color: scheme.secondary),
                           onPressed: _price < _maxPrice ? () => update(() => _price = (_price + _priceStep).clamp(_minPrice, _maxPrice)) : null
                         ),
                       ],
@@ -397,7 +398,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                       Text('Nombre de sièges: ${_seats.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold)),
                       Slider(
                         value: _seats, min: 1, max: 4, divisions: 3,
-                        activeColor: Colors.blue[800],
+                        activeColor: scheme.primary,
                         onChanged: (val) => update(() => _seats = val),
                       ),
                     ],
@@ -408,7 +409,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                         Navigator.pop(context);
                         _publishRide();
                       },
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      style: ElevatedButton.styleFrom(backgroundColor: scheme.primary, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                       child: _isLoadingPublish 
                         ? const CircularProgressIndicator(color: Colors.white) 
                         : Text(_isEditing ? "Enregistrer les modifications" : "Publier le trajet", style: const TextStyle(fontSize: 18, color: Colors.white)),
@@ -477,21 +478,35 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 100.0),
         child: FloatingActionButton(
           onPressed: _goToCurrentLocation,
-          backgroundColor: Colors.white,
+          backgroundColor: scheme.surface,
           child: _isLoadingLocation
-              ? const CircularProgressIndicator(color: Colors.blue)
-              : const Icon(Icons.my_location, color: Colors.blue),
+              ? CircularProgressIndicator(color: scheme.primary)
+              : Icon(Icons.my_location, color: scheme.primary),
         ),
       ),
       appBar: AppBar(
-        title: Text(_isEditing ? 'Modifier le trajet' : 'Proposer un trajet'), 
-        backgroundColor: Colors.blue[700], 
-        foregroundColor: Colors.white
+        title: Text(_isEditing ? 'Modifier le trajet' : 'Proposer un trajet'),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [scheme.primary, scheme.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       body: Stack(
         children: [
@@ -505,15 +520,15 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
             children: [
               TileLayer(urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
               if (_routePoints.isNotEmpty)
-                PolylineLayer(polylines: [Polyline(points: _routePoints, color: Colors.blue, strokeWidth: 5.0)]),
+                PolylineLayer(polylines: [Polyline(points: _routePoints, color: scheme.primary, strokeWidth: 5.0)]),
               MarkerLayer(markers: [
-                Marker(point: _estAgadirLocation, child: const Icon(Icons.location_on, color: Colors.blue, size: 40)),
+                Marker(point: _estAgadirLocation, child: Icon(Icons.location_on, color: scheme.tertiary, size: 40)),
                 if (_pickedLocation != null)
-                  Marker(point: _pickedLocation!, child: const Icon(Icons.location_pin, color: Colors.red, size: 40)),
+                  Marker(point: _pickedLocation!, child: Icon(Icons.location_pin, color: scheme.secondary, size: 40)),
               ]),
             ],
           ),
-          if (_isLoadingMap) const Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
+          if (_isLoadingMap) Center(child: CircularProgressIndicator(color: scheme.primary)),
           
           if (_pickedLocation != null)
             Positioned(
@@ -524,8 +539,8 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                   _showRideDetailsForm();
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),

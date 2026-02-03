@@ -54,6 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _showLogoutConfirmation() {
+    final scheme = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -70,7 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Navigator.pop(context);
                 _logout();
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              style: ElevatedButton.styleFrom(backgroundColor: scheme.error),
               child: Text(Translations.getText(context, 'logout_btn'), style: const TextStyle(color: Colors.white)),
             ),
           ],
@@ -83,47 +84,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Hada ghayban GHIR f l-Home
   // --- HEADER SPECIAL (Bonjour + Logout) ---
   // Hada ghayban GHIR f l-Home
-  Widget _buildHomeHeader() {
+    Widget _buildHomeHeader() {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.blue[800],
+        gradient: LinearGradient(
+          colors: [scheme.primary, scheme.secondary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
         ),
       ),
-      padding: const EdgeInsets.only(top: 60, left: 25, right: 25, bottom: 25), // Padding ajusté pour SafeArea
+      padding: const EdgeInsets.only(top: 60, left: 24, right: 24, bottom: 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
-               // Avatar
-               UserAvatar(
-                 userName: _getUserName(),
-                 imageUrl: FirebaseAuth.instance.currentUser?.photoURL,
-                 radius: 28,
-                 backgroundColor: Colors.white,
-                 textColor: Colors.blue[800],
-                 fontSize: 22,
-               ),
-               const SizedBox(width: 15),
-               Column(
-                 crossAxisAlignment: CrossAxisAlignment.start,
-                 children: [
-                   Text(Translations.getText(context, 'home_title'), style: const TextStyle(fontSize: 16, color: Colors.white70)),
-                   Text(
-                     _getUserName(),
-                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                   ),
-                 ],
-               ),
+              UserAvatar(
+                userName: _getUserName(),
+                imageUrl: FirebaseAuth.instance.currentUser?.photoURL,
+                radius: 28,
+                backgroundColor: Colors.white,
+                textColor: scheme.primary,
+                fontSize: 22,
+              ),
+              const SizedBox(width: 15),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    Translations.getText(context, 'home_title'),
+                    style: textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                  ),
+                  Text(
+                    _getUserName(),
+                    style: textTheme.titleLarge?.copyWith(color: Colors.white),
+                  ),
+                ],
+              ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _showLogoutConfirmation,
-            tooltip: "Déconnexion",
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.logout, color: Colors.white),
+              onPressed: _showLogoutConfirmation,
+              tooltip: 'Deconnexion',
+            ),
           ),
         ],
       ),
@@ -133,6 +149,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // --- TAB 1: HOME VIEW ---
   Widget _buildHomeView() {
     final LatLng defaultStartLocation = LatLng(30.4000, -9.6000);
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       children: [
         // Header hna dakhil l-page Home
@@ -151,7 +168,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     title: Translations.getText(context, 'driver_card'),
                     subtitle: Translations.getText(context, 'driver_subtitle'),
                     icon: Icons.directions_car,
-                    color: Colors.blue[800]!,
+                    color: scheme.primary,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -172,7 +189,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     title: Translations.getText(context, 'passenger_card'),
                     subtitle: Translations.getText(context, 'passenger_subtitle'),
                     icon: Icons.search,
-                    color: Colors.green[600]!,
+                    color: scheme.secondary,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -192,23 +209,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // --- TAB 2: MES TRAJETS VIEW (Driver & Passenger) ---
   Widget _buildMyRidesView() {
+    final scheme = Theme.of(context).colorScheme;
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: Text(Translations.getText(context, 'my_activities')),
-          backgroundColor: Colors.blue[800],
+          backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
           automaticallyImplyLeading: false,
           centerTitle: true,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [scheme.primary, scheme.secondary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
           bottom: TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white70,
             indicatorColor: Colors.white,
             tabs: [
-              Tab(text: Translations.getText(context, 'my_ads')),     // Ce que j'ai publié (Conducteur)
-              Tab(text: Translations.getText(context, 'my_bookings')), // Ce que j'ai demandé (Passager)
+              Tab(text: Translations.getText(context, 'my_ads')),
+              Tab(text: Translations.getText(context, 'my_bookings')),
             ],
           ),
         ),
@@ -224,6 +253,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // --- SUB-VIEW: Driver Rides ---
   Widget _buildDriverRides() {
+    final scheme = Theme.of(context).colorScheme;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Center(child: Text("Non connecté"));
 
@@ -277,79 +307,94 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         userName: user.displayName ?? 'Moi',
                         imageUrl: user.photoURL,
                         radius: 20,
-                        backgroundColor: Colors.blue[50],
-                        textColor: Colors.blue[800],
+                        backgroundColor: scheme.primary.withOpacity(0.12),
+                        textColor: scheme.primary,
                     ),
                     trailing: Text(
                       "$seats P. Disp.",
-                      style: TextStyle(fontWeight: FontWeight.bold, color: seats > 0 ? Colors.green : Colors.red),
+                      style: TextStyle(fontWeight: FontWeight.bold, color: seats > 0 ? scheme.secondary : scheme.error),
                     ),
                   ),
                   const Divider(height: 1),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // Edit
-                      TextButton.icon(
-                        icon: const Icon(Icons.edit, size: 18, color: Colors.blue),
-                        label: Text(Translations.getText(context, 'edit'), style: const TextStyle(color: Colors.blue)),
-                        onPressed: () {
-                          // Navigate to Edit Mode
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => RideDetailsScreen(
-                                startLocation: LatLng(
-                                  data['startLat'] ?? 30.4000, 
-                                  data['startLng'] ?? -9.6000
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: Wrap(
+                      alignment: WrapAlignment.spaceEvenly,
+                      runSpacing: 6,
+                      spacing: 8,
+                      children: [
+                        TextButton.icon(
+                          icon: Icon(Icons.edit, size: 18, color: scheme.primary),
+                          label: Text(Translations.getText(context, 'edit'), style: TextStyle(color: scheme.primary)),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => RideDetailsScreen(
+                                  startLocation: LatLng(
+                                    data['startLat'] ?? 30.4000, 
+                                    data['startLng'] ?? -9.6000
+                                  ),
+                                  rideId: rideDoc.id,
+                                  rideData: data,
                                 ),
-                                rideId: rideDoc.id,
-                                rideData: data,
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                      // Delete
-                      TextButton.icon(
-                        icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                        label: Text(Translations.getText(context, 'delete'), style: const TextStyle(color: Colors.red)),
-                        onPressed: () => _deleteRide(rideDoc.id),
-                      ),
-                      // Requests
-                      // Requests with Badge
-                      StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('bookings')
-                            .where('rideId', isEqualTo: rideDoc.id)
-                            .where('status', isEqualTo: 'pending')
-                            .snapshots(),
-                        builder: (context, snap) {
-                          int count = 0;
-                          if (snap.hasData) {
-                             count = snap.data!.docs.length;
-                          }
-                          
-                          return TextButton.icon(
-                            icon: count > 0 
-                              ? Badge(
-                                  label: Text('$count'),
-                                  backgroundColor: Colors.red,
-                                  child: const Icon(Icons.people_alt_outlined, size: 18),
+                            );
+                          },
+                        ),
+                        TextButton.icon(
+                          icon: Icon(Icons.delete_outline, size: 18, color: scheme.error),
+                          label: Text(Translations.getText(context, 'delete'), style: TextStyle(color: scheme.error)),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          ),
+                          onPressed: () => _deleteRide(rideDoc.id),
+                        ),
+                        StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('bookings')
+                              .where('rideId', isEqualTo: rideDoc.id)
+                              .where('status', isEqualTo: 'pending')
+                              .snapshots(),
+                          builder: (context, snap) {
+                            int count = 0;
+                            if (snap.hasData) {
+                               count = snap.data!.docs.length;
+                            }
+                            
+                            return TextButton.icon(
+                              icon: count > 0 
+                                ? Badge(
+                                    label: Text('$count'),
+                                    backgroundColor: scheme.error,
+                                    child: const Icon(Icons.people_alt_outlined, size: 18),
+                                  )
+                                : const Icon(Icons.people_alt_outlined, size: 18),
+                              label: Text(
+                                Translations.getText(context, 'requests'), 
+                                style: TextStyle(
+                                  fontWeight: count > 0 ? FontWeight.bold : FontWeight.normal,
+                                  color: count > 0 ? scheme.primary : null
                                 )
-                              : const Icon(Icons.people_alt_outlined, size: 18),
-                            label: Text(
-                              Translations.getText(context, 'requests'), 
-                              style: TextStyle(
-                                fontWeight: count > 0 ? FontWeight.bold : FontWeight.normal,
-                                color: count > 0 ? Colors.blue[900] : null
-                              )
-                            ),
-                            onPressed: () => _showRequestsModal(context, rideDoc.id),
-                          );
-                        }
-                      ),
-                    ],
+                              ),
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              ),
+                              onPressed: () => _showRequestsModal(context, rideDoc.id),
+                            );
+                          }
+                        ),
+                      ],
+                    ),
                   )
                 ],
               ),
@@ -362,6 +407,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // --- SUB-VIEW: Passenger Bookings ---
   Widget _buildPassengerBookings() {
+    final scheme = Theme.of(context).colorScheme;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Center(child: Text("Non connecté"));
 
@@ -377,7 +423,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Text("Erreur: ${snapshot.error}", style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+              child: Text("Erreur: ${snapshot.error}", style: TextStyle(color: scheme.error), textAlign: TextAlign.center),
             ),
           );
         }
@@ -421,18 +467,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             switch (status) {
               case 'accepted':
-                statusColor = Colors.green;
+                statusColor = scheme.secondary;
                 statusText = Translations.getText(context, 'accepted');
                 statusIcon = Icons.check_circle;
                 break;
               case 'rejected':
-                statusColor = Colors.red;
+                statusColor = scheme.error;
                 statusText = Translations.getText(context, 'rejected');
                 statusIcon = Icons.cancel;
                 break;
               case 'pending':
               default:
-                statusColor = Colors.orange;
+                statusColor = scheme.tertiary;
                 statusText = Translations.getText(context, 'pending');
                 statusIcon = Icons.hourglass_empty;
                 break;
@@ -472,7 +518,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                imageUrl: b['driverPhotoUrl'],
                                radius: 22,
                                backgroundColor: Theme.of(context).cardColor,
-                               textColor: Colors.blue,
+                               textColor: scheme.primary,
                              )
                            : FutureBuilder<DocumentSnapshot>(
                                future: FirebaseFirestore.instance.collection('rides').doc(b['rideId']).get(),
@@ -486,7 +532,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                    imageUrl: fallbackUrl,
                                    radius: 22,
                                    backgroundColor: Theme.of(context).cardColor,
-                                   textColor: Colors.blue,
+                                   textColor: scheme.primary,
                                  );
                                },
                              ),
@@ -509,7 +555,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                if (dateStr.isNotEmpty)
                                  Text(
                                    dateStr,
-                                   style: const TextStyle(color: Colors.blueGrey, fontSize: 12, fontWeight: FontWeight.bold),
+                                   style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.bold),
                                  ),
                              ],
                            ),
@@ -519,7 +565,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                            children: [
                              Text(
                                "${b['ridePrice'] ?? '?'} MAD",
-                               style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 16),
+                               style: TextStyle(fontWeight: FontWeight.bold, color: scheme.secondary, fontSize: 16),
                              ),
                              const SizedBox(height: 5),
                              Container(
@@ -558,8 +604,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   )
                                 ));
                              },
-                             icon: const Icon(Icons.chat_bubble_outline, size: 20, color: Colors.blue),
-                             label: Text(Translations.getText(context, 'discuss'), style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                             icon: Icon(Icons.chat_bubble_outline, size: 20, color: scheme.primary),
+                             label: Text(Translations.getText(context, 'discuss'), style: TextStyle(color: scheme.primary, fontWeight: FontWeight.bold)),
                            ),
                          
                          // Delete/Cancel Button for all statuses
@@ -568,11 +614,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                            icon: Icon(
                              status == 'accepted' ? Icons.delete_forever : Icons.delete_outline, 
                              size: 20, 
-                             color: Colors.red
+                             color: scheme.error
                            ),
                            label: Text(
                              status == 'pending' ? Translations.getText(context, 'cancel') : Translations.getText(context, 'delete'),
-                             style: const TextStyle(color: Colors.red),
+                             style: TextStyle(color: scheme.error),
                            ),
                          ),
                        ],
@@ -588,6 +634,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _deleteBooking(String bookingId, bool isAccepted) async {
+    final scheme = Theme.of(context).colorScheme;
     // Confirmation Dialog
     final bool? confirm = await showDialog<bool>(
       context: context, 
@@ -602,7 +649,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () {
               Navigator.pop(ctx, true);
             }, 
-            child: const Text("Confirmer", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))
+            child: Text("Confirmer", style: TextStyle(color: scheme.error, fontWeight: FontWeight.bold))
           )
         ],
       )
@@ -652,16 +699,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
   void _deleteRide(String rideId) async {
+    final scheme = Theme.of(context).colorScheme;
     final bool? confirm = await showDialog<bool>(
       context: context, 
       builder: (ctx) => AlertDialog(
-        title: const Text("Supprimer"),
+        title: Text("Supprimer"),
         content: const Text("Voulez-vous supprimer ce trajet ?\nCela annulera toutes les réservations associées."),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler")),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true), 
-            child: const Text("Supprimer", style: TextStyle(color: Colors.red))
+            child: Text("Supprimer", style: TextStyle(color: scheme.error))
           )
         ],
       )
@@ -706,6 +754,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // --- LOGIC: Driver Requests Modal ---
   void _showRequestsModal(BuildContext context, String rideId) {
+    final scheme = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -777,7 +826,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       Text(
                                         status == 'pending' ? 'En attente' : status == 'accepted' ? 'Accepté' : 'Refusé',
                                         style: TextStyle(
-                                          color: status == 'pending' ? Colors.orange : status == 'accepted' ? Colors.green : Colors.red,
+                                          color: status == 'pending' ? scheme.tertiary : status == 'accepted' ? scheme.secondary : scheme.error,
                                           fontSize: 12,
                                           fontWeight: FontWeight.w500
                                         ),
@@ -787,18 +836,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 if (status == 'pending') ...[
                                   IconButton(
-                                    icon: const Icon(Icons.check_circle, color: Colors.green, size: 30),
+                                    icon: Icon(Icons.check_circle, color: scheme.secondary, size: 30),
                                     onPressed: () => _handleBooking(req.id, rideId, true, rData['passengerId']),
                                     tooltip: "Accepter",
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.cancel, color: Colors.red, size: 30),
+                                    icon: Icon(Icons.cancel, color: scheme.error, size: 30),
                                     onPressed: () => _handleBooking(req.id, rideId, false, rData['passengerId']),
                                     tooltip: "Refuser",
                                   ),
                                 ] else if (status == 'accepted') ...[
                                   IconButton(
-                                    icon: const Icon(Icons.chat_bubble, color: Colors.blue),
+                                    icon: Icon(Icons.chat_bubble, color: scheme.primary),
                                     tooltip: "Discuter",
                                     onPressed: () {
                                       Navigator.push(context, MaterialPageRoute(
@@ -811,7 +860,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       ));
                                     },
                                   ),
-                                  const Icon(Icons.check_circle_outline, color: Colors.green),
+                                  Icon(Icons.check_circle_outline, color: scheme.secondary),
                                 ] else ...[
                                   const Icon(Icons.cancel_outlined, color: Colors.grey),
                                 ]
@@ -942,78 +991,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: pages[_currentIndex],
 
       // Navigation Bar l-ta7t
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5))
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          backgroundColor: Theme.of(context).cardColor,
-          selectedItemColor: Colors.blue[800],
-          unselectedItemColor: Colors.grey,
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded),
-              label: 'Accueil',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.list_alt_rounded),
-              label: 'Mes Activités',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings),
-              label: 'Paramètres',
-            ),
-          ],
-        ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_rounded),
+            label: 'Accueil',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.list_alt_rounded),
+            label: 'Mes activites',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings),
+            label: 'Parametres',
+          ),
+        ],
       ),
     );
   }
 
-  // Widget Design Card (Helper)
+    // Widget Design Card (Helper)
   Widget _buildRoleCard(BuildContext context, {required String title, required String subtitle, required IconData icon, required Color color, required VoidCallback onTap}) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 5))
+            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 18, offset: const Offset(0, 8))
           ],
-          border: Border.all(color: color.withOpacity(0.1), width: 1),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-              child: Icon(icon, size: 40, color: color),
+              height: 58,
+              width: 58,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [color, color.withOpacity(0.75)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 30, color: Colors.white),
             ),
-            const SizedBox(width: 20),
+            const SizedBox(width: 18),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-                  const SizedBox(height: 5),
-                  Text(subtitle, style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  Text(title, style: textTheme.titleMedium?.copyWith(color: color)),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, color: Colors.grey[300], size: 18),
+            Icon(Icons.arrow_forward_rounded, color: scheme.onSurfaceVariant, size: 18),
           ],
         ),
       ),

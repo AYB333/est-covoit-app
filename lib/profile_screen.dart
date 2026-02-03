@@ -196,7 +196,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     decoration: InputDecoration(
                       labelText: Translations.getText(context, 'password_field'),
                       hintText: 'Min 6 caractères',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       suffixIcon: IconButton(
                         icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -246,12 +245,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(Translations.getText(context, 'profile')),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [scheme.primary, scheme.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -267,8 +280,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                      userName: _nameController.text,
                      imageUrl: FirebaseAuth.instance.currentUser?.photoURL,
                      radius: 60,
-                     backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                     textColor: Theme.of(context).colorScheme.primary,
+                     backgroundColor: scheme.primary.withOpacity(0.2),
+                     textColor: scheme.primary,
                      fontSize: 40,
                    ),
                    Positioned(
@@ -281,7 +294,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         height: 40,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: scheme.primary,
                           border: Border.all(color: Colors.white, width: 3),
                         ),
                         child: _isUploadingImage 
@@ -298,15 +311,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Name Field
             Text(
               Translations.getText(context, 'name_field'),
-              style: Theme.of(context).textTheme.labelLarge,
+              style: textTheme.labelLarge,
             ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _nameController,
               decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                filled: true,
-                fillColor: isDark ? Colors.grey[800] : Colors.grey[100],
                 prefixIcon: const Icon(Icons.person),
               ),
             ),
@@ -315,16 +325,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Email Field (Read-only)
             Text(
               Translations.getText(context, 'email_field'),
-              style: Theme.of(context).textTheme.labelLarge,
+              style: textTheme.labelLarge,
             ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _emailController,
               readOnly: true,
               decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                filled: true,
-                fillColor: isDark ? Colors.grey[800] : Colors.grey[100],
                 prefixIcon: const Icon(Icons.email),
               ),
             ),
@@ -341,9 +348,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               keyboardType: TextInputType.phone,
               decoration: InputDecoration(
                 hintText: "06 12 34 56 78",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                filled: true,
-                fillColor: isDark ? Colors.grey[800] : Colors.grey[100],
                 prefixIcon: const Icon(Icons.phone),
               ),
             ),
@@ -353,7 +357,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                  color: scheme.primary.withOpacity(0.3),
                 ),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -362,7 +366,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 leading: Icon(
                   Icons.lock,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: scheme.primary,
                 ),
                 title: Text(
                   Translations.getText(context, 'change_password'),
@@ -371,7 +375,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 trailing: Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: scheme.primary,
                 ),
                 onTap: _showChangePasswordDialog,
               ),
