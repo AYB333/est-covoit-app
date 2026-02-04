@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'language_service.dart';
+import '../services/language_service.dart';
 
 class Translations {
   static const Map<String, Map<String, String>> _translations = {

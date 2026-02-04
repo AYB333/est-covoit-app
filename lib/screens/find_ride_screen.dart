@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
-import 'ride_map_viewer.dart';
+import 'package:est_covoit/screens/ride_map_viewer.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'user_avatar.dart';
-import 'translations.dart';
-import 'booking_service.dart';
+import '../widgets/user_avatar.dart';
+import '../config/translations.dart';
+import '../services/booking_service.dart';
 
 
 class FindRideScreen extends StatefulWidget {

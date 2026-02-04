@@ -3,7 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'booking_service.dart';
+import '../services/booking_service.dart';
 
 class RideMapViewer extends StatefulWidget {
   final List<LatLng> polylinePoints;
@@ -42,13 +42,13 @@ class _RideMapViewerState extends State<RideMapViewer> {
 
   Future<void> _reserveRide() async {
     if (widget.rideId == null || widget.rideData == null) {
-      _showSnackBar("Erreur: Données du trajet manquantes.", Colors.red);
+      _showSnackBar("Erreur: DonnÃ©es du trajet manquantes.", Colors.red);
       return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnackBar("Vous devez être connecté.", Colors.red);
+      _showSnackBar("Vous devez Ãªtre connectÃ©.", Colors.red);
       return;
     }
 
@@ -56,8 +56,8 @@ class _RideMapViewerState extends State<RideMapViewer> {
     bool? confirm = await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Confirmer la réservation"),
-        content: const Text("Voulez-vous envoyer une demande de réservation au conducteur ?"),
+        title: const Text("Confirmer la rÃ©servation"),
+        content: const Text("Voulez-vous envoyer une demande de rÃ©servation au conducteur ?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler")),
           ElevatedButton(
@@ -180,7 +180,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
                           onPressed: seats > 0 ? _reserveRide : null,
                           icon: const Icon(Icons.bookmark_added, color: Colors.white),
                           label: Text(
-                            seats > 0 ? 'Réserver ce trajet' : 'Complet', 
+                            seats > 0 ? 'RÃ©server ce trajet' : 'Complet', 
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
                           ),
                           style: ElevatedButton.styleFrom(
@@ -201,3 +201,5 @@ class _RideMapViewerState extends State<RideMapViewer> {
     );
   }
 }
+
+

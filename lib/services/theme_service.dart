@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'app_theme.dart';
+import '../config/app_theme.dart';
 
 class ThemeService extends ChangeNotifier {
   bool _isDarkMode = false;

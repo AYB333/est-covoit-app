@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'profile_screen.dart';
-import 'theme_service.dart';
-import 'language_service.dart';
-import 'translations.dart';
+import '../services/theme_service.dart';
+import '../services/language_service.dart';
+import '../config/translations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'notification_service.dart';
+import '../services/notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});

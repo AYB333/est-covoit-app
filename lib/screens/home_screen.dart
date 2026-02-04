@@ -7,10 +7,10 @@ import 'login_screen.dart';
 import 'ride_details_screen.dart';
 import 'add_ride_screen.dart';
 import 'settings_screen.dart';
-import 'translations.dart';
+import '../config/translations.dart';
 import 'chat_screen.dart';
-import 'user_avatar.dart';
-import 'notification_service.dart';
+import '../widgets/user_avatar.dart';
+import '../services/notification_service.dart';
 
 
 class DashboardScreen extends StatefulWidget {
