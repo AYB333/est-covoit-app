@@ -1,16 +1,61 @@
-# est_covoit
+﻿# est_covoit
 
-A new Flutter project.
+Flutter app de covoiturage avec authentification et gestion de trajets.
+Objectif: code organise, clair et facile a maintenir sans changer le comportement.
 
-## Getting Started
+## Stack
+- Flutter / Dart
+- Firebase (Auth, Firestore, Messaging)
+- Provider (theme / language)
 
-This project is a starting point for a Flutter application.
+## Structure du projet
+- `lib/config/` : theme + traductions
+- `lib/screens/` : ecrans principaux
+- `lib/services/` : services et logique (Firebase, notifications, etc.)
+- `lib/widgets/` : widgets reutilisables
+- `lib/main.dart` : point d'entree
 
-A few resources to get you started if this is your first Flutter project:
+### Home (module principal)
+- `lib/screens/home_screen.dart` : orchestrateur (tabs + bottom nav)
+- `lib/widgets/home/home_tab_view.dart` : contenu onglet Home
+- `lib/widgets/home/home_header.dart` : header (avatar + bonjour + logout)
+- `lib/widgets/home/home_role_card.dart` : cartes Conducteur / Passager
+- `lib/widgets/home/my_rides_tab.dart` : onglet Mes trajets
+- `lib/widgets/home/driver_rides_list.dart` : liste rides conducteur
+- `lib/widgets/home/passenger_bookings_list.dart` : liste bookings passager
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Ecrans principaux
+- `lib/screens/login_screen.dart`
+- `lib/screens/signup_screen.dart`
+- `lib/screens/splash_screen.dart`
+- `lib/screens/settings_screen.dart`
+- `lib/screens/profile_screen.dart`
+- `lib/screens/add_ride_screen.dart`
+- `lib/screens/find_ride_screen.dart`
+- `lib/screens/ride_details_screen.dart`
+- `lib/screens/ride_map_viewer.dart`
+- `lib/screens/chat_screen.dart`
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Services
+- `lib/services/notification_service.dart` : notifications locales + FCM
+- `lib/services/booking_service.dart` : creation / gestion reservations
+- `lib/services/theme_service.dart` : theme (dark / light)
+- `lib/services/language_service.dart` : langue
+
+## Config UI
+- `lib/config/app_theme.dart`
+- `lib/config/translations.dart`
+
+## Firebase
+Collections principales:
+- `rides`
+- `bookings`
+
+## Commandes utiles
+- Analyse: `flutter analyze`
+- Run: `flutter run`
+
+## Notes
+- Organisation only (pas de changement de logique)
+- Design conserve
+- Imports a jour apres reorganisation
