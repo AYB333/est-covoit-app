@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:est_covoit/screens/ride_map_viewer.dart';
@@ -7,6 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/user_avatar.dart';
 import '../config/translations.dart';
 import '../services/booking_service.dart';
+import '../models/ride.dart';
+import '../repositories/ride_repository.dart';
 
 
 class FindRideScreen extends StatefulWidget {
@@ -80,14 +81,11 @@ class _FindRideScreenState extends State<FindRideScreen> {
           ),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
+      body: StreamBuilder<List<Ride>>(
         // Filter rides where the 'date' field is greater than or equal to the current date/time
-        stream: FirebaseFirestore.instance
-            .collection('rides')
-            // Relaxed filter: Show rides from last 24 hours
-            .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 1))))
-            .orderBy('date', descending: false)
-            .snapshots(),
+        stream: RideRepository().streamAvailableRidesFrom(
+          DateTime.now().subtract(const Duration(days: 1)),
+        ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -95,7 +93,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
           if (snapshot.hasError) {
             return Center(child: Text('Erreur: ${snapshot.error}'));
           }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -108,37 +106,33 @@ class _FindRideScreenState extends State<FindRideScreen> {
             );
           }
 
-          final allRides = snapshot.data!.docs;
+          final allRides = snapshot.data!;
           final Distance distanceCalculator = const Distance();
 
           // Filter rides that pass near the user (within 3 km radius)
           final filteredRides = allRides.where((ride) {
-            final data = ride.data() as Map<String, dynamic>;
-            
             // 1. Check if potential route points exist
-            List<dynamic> rawPoints = data['polylinePoints'] ?? [];
-            if (rawPoints.isEmpty) {
+            if (ride.polylinePoints.isEmpty) {
               // Fallback: Check start location distance if no route data
-              double startLat = (data['startLat'] as num?)?.toDouble() ?? 0.0;
-              double startLng = (data['startLng'] as num?)?.toDouble() ?? 0.0;
-              if (startLat != 0 && startLng != 0) {
-                 return distanceCalculator.as(LengthUnit.Meter, pickup, LatLng(startLat, startLng)) < 800;
+              if (ride.startLat != 0 && ride.startLng != 0) {
+                 return distanceCalculator.as(
+                   LengthUnit.Meter,
+                   pickup,
+                   LatLng(ride.startLat, ride.startLng),
+                 ) < 800;
               }
               return false;
             }
 
             // 2. Check if ANY point on the route is close to user
             // Optimization: radius reduced to 800m for better accuracy
-            for (var p in rawPoints) {
-              final double lat = (p['latitude'] as num).toDouble();
-              final double lng = (p['longitude'] as num).toDouble();
-              final double distInfo = distanceCalculator.as(LengthUnit.Meter, pickup, LatLng(lat, lng));
-              
+            for (var p in ride.polylinePoints) {
+              final double distInfo = distanceCalculator.as(LengthUnit.Meter, pickup, p);
               if (distInfo < 800) { // 800 meters tolerance
-                return true; 
+                return true;
               }
             }
-            
+
             return false;
           }).toList();
 
@@ -175,37 +169,30 @@ class _FindRideScreenState extends State<FindRideScreen> {
                 itemCount: filteredRides.length,
                 itemBuilder: (context, index) {
                   final ride = filteredRides[index];
-                  final data = ride.data() as Map<String, dynamic>;
+                  final rideData = ride.toMap();
 
                   String formattedDate = "Date inconnue";
                   try {
-                    if (data['date'] != null && data['date'] is Timestamp) {
-                      formattedDate = DateFormat('dd/MM/yyyy HH:mm').format((data['date'] as Timestamp).toDate());
-                    }
+                    formattedDate = DateFormat('dd/MM/yyyy HH:mm').format(ride.date);
                   } catch (e) {
                     formattedDate = "Erreur date";
                   }
 
-                  String driverName = data['driverName']?.toString() ?? "Inconnu";
-                  String destinationName = data['destinationName']?.toString() ?? "EST Agadir";
+                  String driverName = ride.driverName;
+                  String destinationName = ride.destinationName;
                   // Get departure address with fallback to coordinates
-                  String departureCity = data['departureAddress']?.toString() ?? 
-                      "${(data['startLat'] as num?)?.toStringAsFixed(2) ?? '?'}, ${(data['startLng'] as num?)?.toStringAsFixed(2) ?? '?'}";
-                  String price = data['price']?.toString() ?? "?";
-                  String seats = data['seats']?.toString() ?? "0";
-                  String? phone = data['phone']?.toString();
-                  DateTime rideDate = (data['date'] as Timestamp).toDate();
+                  String departureCity = ride.departureAddress ??
+                      "${ride.startLat.toStringAsFixed(2)}, ${ride.startLng.toStringAsFixed(2)}";
+                  String price = ride.price.toString();
+                  String seats = ride.seats.toString();
+                  String? phone;
+                  DateTime rideDate = ride.date;
                   
-                  List<LatLng> polylinePoints = [];
-                  if (data['polylinePoints'] != null) {
-                    polylinePoints = (data['polylinePoints'] as List<dynamic>)
-                        .map((p) => LatLng((p['latitude'] as num).toDouble(), (p['longitude'] as num).toDouble()))
-                        .toList();
-                  }
+                  List<LatLng> polylinePoints = ride.polylinePoints;
 
-                  final bool isMyRide = currentUserUid == data['driverId'];
-                  final String vehicleType = data['vehicleType'] ?? 'Voiture';
-                  final int availableSeats = int.tryParse(data['seats'].toString()) ?? 0;
+                  final bool isMyRide = currentUserUid == ride.driverId;
+                  final String vehicleType = ride.vehicleType;
+                  final int availableSeats = ride.seats;
 
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 10.0),
@@ -226,7 +213,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                     children: [
                                       UserAvatar(
                                         userName: driverName,
-                                        imageUrl: data['driverPhotoUrl'],
+                                        imageUrl: ride.driverPhotoUrl,
                                         radius: 20,
                                         backgroundColor: scheme.primary.withOpacity(0.12),
                                         textColor: scheme.primary,
@@ -345,7 +332,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                               price: price,
                                               date: rideDate,
                                               rideId: ride.id,
-                                              rideData: data,
+                                              rideData: rideData,
                                             ),
                                           ),
                                         );
@@ -363,7 +350,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                     Expanded(
                                       child: ElevatedButton.icon(
                                         onPressed: availableSeats > 0 
-                                          ? () => _reserveRide(context, ride.id, data) 
+                                          ? () => _reserveRide(context, ride.id, rideData) 
                                           : null,
                                         icon: const Icon(Icons.bookmark_add, size: 18),
                                         label: const Text("Réserver"),

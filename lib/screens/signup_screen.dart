@@ -1,11 +1,10 @@
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../widgets/user_avatar.dart';
+import '../services/auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -24,16 +23,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
   File? _selectedImage;
 
   Future<void> _pickImage() async {
+    // Create a picker instance
     final picker = ImagePicker();
+    // Pick an image from gallery (compressed to 70% quality)
     final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     if (pickedFile != null) {
       setState(() {
+        // Save the selected image for preview and upload
         _selectedImage = File(pickedFile.path);
       });
     }
   }
 
   Future<void> _signUp() async {
+    // Basic validation: all fields required
     if (_nameController.text.isEmpty ||
         _emailController.text.isEmpty ||
         _passwordController.text.isEmpty ||
@@ -42,46 +45,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
+    // Domain check: only academic email
     if (!_emailController.text.trim().endsWith("@edu.uiz.ac.ma")) {
       _showError("Veuillez utiliser votre email academique (@edu.uiz.ac.ma).");
       return;
     }
 
+    // Disable button and show loader
     setState(() => _isLoading = true);
 
     try {
-      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      // 1) Create user in Firebase Auth
+      await AuthService().signUp(
+        name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
+        profileImage: _selectedImage,
       );
-
-      String? photoUrl;
-      if (_selectedImage != null) {
-        try {
-          final ref = FirebaseStorage.instance.ref().child('profile_images/${userCredential.user!.uid}.jpg');
-          final metadata = SettableMetadata(contentType: 'image/jpeg');
-          final uploadTask = ref.putFile(_selectedImage!, metadata);
-          final snapshot = await uploadTask.whenComplete(() => null);
-          if (snapshot.state == TaskState.success) {
-            await Future.delayed(const Duration(milliseconds: 500));
-            photoUrl = await snapshot.ref.getDownloadURL();
-          }
-        } catch (_) {
-          // Keep going if upload fails.
-        }
-      }
-
-      await userCredential.user?.updateProfile(
-        displayName: _nameController.text.trim(),
-        photoURL: photoUrl,
-      );
-      await userCredential.user?.reload();
-
-      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
-        'phoneNumber': _phoneController.text.trim(),
-      }, SetOptions(merge: true));
 
       if (!mounted) return;
+      // Success feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(
@@ -100,6 +84,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return;
+      // Back to login screen
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       String message = "Erreur d'inscription.";
@@ -130,6 +115,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   void dispose() {
+    // Dispose controllers to avoid memory leaks
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -145,6 +131,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return Scaffold(
       body: Stack(
         children: [
+          // Background gradient
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -154,6 +141,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
             ),
           ),
+          // Decorative circle
           Positioned(
             top: -70,
             left: -40,
@@ -166,6 +154,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
             ),
           ),
+          // Main content area
           SafeArea(
             child: Column(
               children: [
@@ -174,6 +163,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   child: Row(
                     children: [
                       IconButton(
+                        // Back to previous screen
                         onPressed: () => Navigator.pop(context),
                         icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
                       ),
@@ -185,8 +175,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     child: Column(
                       children: [
+                        // Page title
                         Text('Creer un compte', style: textTheme.displaySmall?.copyWith(color: Colors.white)),
                         const SizedBox(height: 8),
+                        // Subtitle
                         Text(
                           'Rejoignez la communaute EST',
                           style: textTheme.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.85)),
@@ -199,6 +191,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             padding: const EdgeInsets.all(24),
                             child: Column(
                               children: [
+                                // Avatar picker (image or initials)
                                 AnimatedBuilder(
                                   animation: _nameController,
                                   builder: (context, _) {
@@ -240,6 +233,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   },
                                 ),
                                 const SizedBox(height: 24),
+                                // Full name
                                 TextField(
                                   controller: _nameController,
                                   decoration: const InputDecoration(
@@ -248,6 +242,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
+                                // Email
                                 TextField(
                                   controller: _emailController,
                                   keyboardType: TextInputType.emailAddress,
@@ -257,6 +252,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
+                                // Password with visibility toggle
                                 TextField(
                                   controller: _passwordController,
                                   obscureText: _obscurePassword,
@@ -270,6 +266,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
+                                // Phone number
                                 TextField(
                                   controller: _phoneController,
                                   keyboardType: TextInputType.phone,
@@ -283,6 +280,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   width: double.infinity,
                                   height: 52,
                                   child: ElevatedButton(
+                                    // Submit signup
                                     onPressed: _isLoading ? null : _signUp,
                                     child: _isLoading
                                         ? const SizedBox(

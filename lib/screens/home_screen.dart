@@ -7,6 +7,7 @@ import '../widgets/home/home_tab_view.dart';
 import '../widgets/home/my_rides_tab.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
+import '../services/auth_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -40,7 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // --- LOGOUT LOGIC ---
   Future<void> _logout() async {
-    await FirebaseAuth.instance.signOut();
+    await AuthService().signOut();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginScreen()),

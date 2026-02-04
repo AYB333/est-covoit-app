@@ -5,6 +5,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import '../models/app_notification.dart';
+import '../repositories/notification_repository.dart';
+import '../repositories/user_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -72,9 +75,7 @@ class NotificationService {
   Future<void> _saveToken(String token) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'fcmToken': token,
-      }, SetOptions(merge: true));
+      await UserRepository().saveFcmToken(user.uid, token);
     }
   }
 
@@ -94,13 +95,7 @@ class NotificationService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    FirebaseFirestore.instance
-        .collection('notifications')
-        .where('receiverId', isEqualTo: user.uid)
-        .where('read', isEqualTo: false)
-        .orderBy('timestamp', descending: false)
-        .snapshots()
-        .listen((snapshot) {
+    NotificationRepository().streamUnreadSnapshots(user.uid).listen((snapshot) {
       for (var change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
           final data = change.doc.data() as Map<String, dynamic>;
@@ -154,15 +149,17 @@ class NotificationService {
     // Don't notify self
     if (user != null && user.uid == receiverId) return;
 
-    await FirebaseFirestore.instance.collection('notifications').add({
-      'receiverId': receiverId,
-      'senderId': user?.uid,
-      'title': title,
-      'body': body,
-      'type': type,
-      'read': false,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
+    final notification = AppNotification(
+      id: '',
+      receiverId: receiverId,
+      senderId: user?.uid,
+      title: title,
+      body: body,
+      type: type,
+      read: false,
+      timestamp: null,
+    );
+    await NotificationRepository().addNotification(notification);
     // Push disabled (free plan). Firestore + local notifications only.
   }
 }

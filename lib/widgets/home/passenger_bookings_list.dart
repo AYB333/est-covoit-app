@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +6,10 @@ import '../../config/translations.dart';
 import '../../screens/chat_screen.dart';
 import '../../services/notification_service.dart';
 import '../user_avatar.dart';
+import '../../models/booking.dart';
+import '../../models/ride.dart';
+import '../../repositories/booking_repository.dart';
+import '../../repositories/ride_repository.dart';
 
 class PassengerBookingsList extends StatefulWidget {
   const PassengerBookingsList({super.key});
@@ -22,8 +25,8 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Center(child: Text("Non connectÃ©"));
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('bookings').where('passengerId', isEqualTo: user.uid).snapshots(),
+    return StreamBuilder<List<Booking>>(
+      stream: BookingRepository().streamPassengerBookings(user.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
 
@@ -36,7 +39,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
           );
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -50,12 +53,10 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
         }
 
         // Client-side sorting to avoid Index issues
-        final bookings = snapshot.data!.docs;
+        final bookings = snapshot.data!;
         bookings.sort((a, b) {
-          final da = a.data() as Map<String, dynamic>;
-          final db = b.data() as Map<String, dynamic>;
-          final Timestamp? tA = da['timestamp'] as Timestamp?;
-          final Timestamp? tB = db['timestamp'] as Timestamp?;
+          final tA = a.timestamp;
+          final tB = b.timestamp;
           if (tA == null) return -1; // Show new items first (optimistic UI)
           if (tB == null) return 1;
           return tB.compareTo(tA); // Descending
@@ -65,9 +66,8 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
           padding: const EdgeInsets.all(16),
           itemCount: bookings.length,
           itemBuilder: (context, index) {
-            final bookingDoc = bookings[index];
-            final b = bookingDoc.data() as Map<String, dynamic>;
-            final String status = b['status'] ?? 'pending';
+            final booking = bookings[index];
+            final String status = booking.status.isEmpty ? 'pending' : booking.status;
 
             Color statusColor;
             String statusText;
@@ -94,14 +94,14 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
 
             // Format Date
             String dateStr = "";
-            if (b['rideDate'] != null) {
+            if (booking.rideDate != null) {
               try {
-                dateStr = DateFormat('dd/MM HH:mm').format((b['rideDate'] as Timestamp).toDate());
+                dateStr = DateFormat('dd/MM HH:mm').format(booking.rideDate!);
               } catch (_) {}
             }
 
             // Route
-            String route = "${b['departureAddress'] ?? 'DÃ©part'} â†’ ${b['rideDestination'] ?? 'EST'}";
+            String route = "${booking.departureAddress ?? 'D\u00E9part'} \u2192 ${booking.rideDestination.isEmpty ? 'EST' : booking.rideDestination}";
             if (route.length > 30) route = "${route.substring(0, 30)}...";
 
             return Card(
@@ -119,23 +119,23 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                     child: Row(
                       children: [
                         // Dynamic Driver Avatar with Fallback
-                        b['driverPhotoUrl'] != null && (b['driverPhotoUrl'] as String).isNotEmpty
+                        booking.driverPhotoUrl != null && booking.driverPhotoUrl!.isNotEmpty
                             ? UserAvatar(
-                                userName: b['driverName'] ?? '?',
-                                imageUrl: b['driverPhotoUrl'],
+                                userName: booking.driverName ?? '?',
+                                imageUrl: booking.driverPhotoUrl,
                                 radius: 22,
                                 backgroundColor: Theme.of(context).cardColor,
                                 textColor: scheme.primary,
                               )
-                            : FutureBuilder<DocumentSnapshot>(
-                                future: FirebaseFirestore.instance.collection('rides').doc(b['rideId']).get(),
+                            : FutureBuilder<Ride?>(
+                                future: RideRepository().fetchRide(booking.rideId),
                                 builder: (context, rideSnap) {
                                   String? fallbackUrl;
-                                  if (rideSnap.hasData && rideSnap.data!.exists) {
-                                    fallbackUrl = (rideSnap.data!.data() as Map<String, dynamic>)['driverPhotoUrl'];
+                                  if (rideSnap.hasData && rideSnap.data != null) {
+                                    fallbackUrl = rideSnap.data!.driverPhotoUrl;
                                   }
                                   return UserAvatar(
-                                    userName: b['driverName'] ?? '?',
+                                    userName: booking.driverName ?? '?',
                                     imageUrl: fallbackUrl,
                                     radius: 22,
                                     backgroundColor: Theme.of(context).cardColor,
@@ -156,7 +156,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                "${Translations.getText(context, 'driver')}: ${b['driverName'] ?? Translations.getText(context, 'unknown')}",
+                                "${Translations.getText(context, 'driver')}: ${booking.driverName ?? Translations.getText(context, 'unknown')}",
                                 style: TextStyle(color: Colors.grey[700], fontSize: 13),
                               ),
                               if (dateStr.isNotEmpty)
@@ -171,7 +171,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              "${b['ridePrice'] ?? '?'} MAD",
+                            "${booking.ridePrice ?? '?'} MAD",
                               style: TextStyle(fontWeight: FontWeight.bold, color: scheme.secondary, fontSize: 16),
                             ),
                             const SizedBox(height: 5),
@@ -206,10 +206,10 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => ChatScreen(
-                                    bookingId: bookingDoc.id,
-                                    otherUserName: b['driverName'] ?? 'Conducteur',
-                                    otherUserId: b['driverId'],
-                                    otherUserPhotoUrl: b['driverPhotoUrl'],
+                                    bookingId: booking.id,
+                                    otherUserName: booking.driverName ?? 'Conducteur',
+                                    otherUserId: booking.driverId,
+                                    otherUserPhotoUrl: booking.driverPhotoUrl,
                                   ),
                                 ),
                               );
@@ -223,7 +223,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
 
                         // Delete/Cancel Button for all statuses
                         TextButton.icon(
-                          onPressed: () => _deleteBooking(bookingDoc.id, status == 'accepted'),
+                          onPressed: () => _deleteBooking(booking.id, status == 'accepted'),
                           icon: Icon(
                             status == 'accepted' ? Icons.delete_forever : Icons.delete_outline,
                             size: 20,
@@ -271,26 +271,21 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
     if (confirm != true) return;
 
     try {
-      final bookingRef = FirebaseFirestore.instance.collection('bookings').doc(bookingId);
-      final doc = await bookingRef.get();
-      if (!doc.exists) return;
+      final bookingRepo = BookingRepository();
+      final booking = await bookingRepo.fetchBooking(bookingId);
+      if (booking == null) return;
 
-      final data = doc.data() as Map<String, dynamic>;
-      final String rideId = data['rideId'];
-      final String driverId = data['driverId'];
-      final String passengerName = data['passengerName'] ?? 'Un passager';
-      final String status = data['status'] ?? 'pending';
+      final String rideId = booking.rideId;
+      final String driverId = booking.driverId;
+      final String passengerName = booking.passengerName.isEmpty ? 'Un passager' : booking.passengerName;
+      final String status = booking.status.isEmpty ? 'pending' : booking.status;
       final bool wasAccepted = status == 'accepted';
 
       if (wasAccepted) {
-        final rideRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
-        await FirebaseFirestore.instance.runTransaction((transaction) async {
-          final rideSnap = await transaction.get(rideRef);
-          if (rideSnap.exists) {
-            transaction.update(rideRef, {'seats': FieldValue.increment(1)});
-          }
-          transaction.delete(bookingRef);
-        });
+        await bookingRepo.deleteBookingAndRestoreSeat(
+          bookingId: bookingId,
+          rideId: rideId,
+        );
 
         // Notify Driver
         NotificationService.sendNotification(
@@ -300,7 +295,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
           type: "booking_cancel",
         );
       } else {
-        await bookingRef.delete();
+        await bookingRepo.deleteBooking(bookingId);
       }
 
       if (mounted) {
@@ -311,3 +306,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
     }
   }
 }
+
+
+
+

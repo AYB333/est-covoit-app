@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import '../models/ride.dart';
+import '../repositories/ride_repository.dart';
 
 class RideDetailsScreen extends StatefulWidget {
   final LatLng startLocation;
@@ -436,38 +438,33 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        List<Map<String, double>> polylineData = _routePoints
-            .map((latlng) => {'latitude': latlng.latitude, 'longitude': latlng.longitude})
-            .toList();
+                final ride = Ride(
+          id: widget.rideId ?? '',
+          driverId: user.uid,
+          driverName: user.displayName ?? 'Utilisateur',
+          driverPhotoUrl: user.photoURL,
+          vehicleType: _selectedVehicle,
+          price: _price,
+          seats: _seats.toInt(),
+          date: _selectedDate!,
+          startLat: _pickedLocation!.latitude,
+          startLng: _pickedLocation!.longitude,
+          departureAddress: _departureAddress,
+          destinationName: 'EST Agadir',
+          status: 'available',
+          polylinePoints: _routePoints,
+          routeDistanceKm: _routeDistanceKm,
+        );
 
-        final Map<String, dynamic> rideData = {
-          'driverId': user.uid,
-          'driverName': user.displayName ?? 'Utilisateur',
-          'driverPhotoUrl': user.photoURL,
-          'vehicleType': _selectedVehicle,
-          'price': _price,
-          'seats': _seats.toInt(),
-          'date': Timestamp.fromDate(_selectedDate!),
-          'startLat': _pickedLocation!.latitude,
-          'startLng': _pickedLocation!.longitude,
-          'departureAddress': _departureAddress,
-          'destinationName': 'EST Agadir',
-          'status': 'available',
-          'polylinePoints': polylineData,
-          'routeDistanceKm': _routeDistanceKm,
-        };
-
+        final repo = RideRepository();
         if (_isEditing) {
-           rideData['updatedAt'] = FieldValue.serverTimestamp();
-           await FirebaseFirestore.instance.collection('rides').doc(widget.rideId).update(rideData);
-           _showSnackBar('Trajet modifiÃ© avec succÃ¨s !', Colors.green);
+           await repo.updateRide(widget.rideId!, ride);
+           _showSnackBar('Trajet modifié avec succès !', Colors.green);
         } else {
-           rideData['createdAt'] = FieldValue.serverTimestamp();
-           await FirebaseFirestore.instance.collection('rides').add(rideData);
-           _showSnackBar('Trajet publiÃ© avec succÃ¨s !', Colors.green);
+           await repo.createRide(ride);
+           _showSnackBar('Trajet publié avec succès !', Colors.green);
         }
-
-        if (mounted) Navigator.pop(context); // Revenir au Dashboard
+if (mounted) Navigator.pop(context); // Revenir au Dashboard
       }
     } catch (e) {
       _showSnackBar('Erreur: $e', Colors.redAccent);
@@ -558,3 +555,4 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     );
   }
 }
+

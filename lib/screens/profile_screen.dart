@@ -4,8 +4,8 @@ import '../config/translations.dart';
 import '../widgets/user_avatar.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../repositories/user_repository.dart';
+import '../services/profile_service.dart';
 
 
 class ProfileScreen extends StatefulWidget {
@@ -34,16 +34,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     _phoneController = TextEditingController(); // Init empty first
 
-    // Fetch Phone Number from Firestore
+    // Fetch Phone Number from Firestore (via repository)
     if (user != null) {
-      FirebaseFirestore.instance.collection('users').doc(user.uid).get().then((doc) {
-        if (doc.exists && doc.data() != null) {
-          final data = doc.data() as Map<String, dynamic>;
-          if (mounted && data.containsKey('phoneNumber')) {
-             setState(() {
-               _phoneController.text = data['phoneNumber'];
-             });
-          }
+      UserRepository().fetchProfile(user.uid).then((profile) {
+        final phone = profile?.phoneNumber;
+        if (mounted && phone != null) {
+          setState(() {
+            _phoneController.text = phone;
+          });
         }
       });
     }
@@ -77,65 +75,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isUploadingImage = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
       final file = File(pickedFile.path);
-      final ref = FirebaseStorage.instance.ref().child('profile_images/${user.uid}.jpg');
-      
-      // Upload
-      final metadata = SettableMetadata(contentType: 'image/jpeg');
-      final uploadTask = ref.putFile(file, metadata);
-      
-      final snapshot = await uploadTask.whenComplete(() => null);
+      await ProfileService().updateProfilePhoto(file);
 
-      if (snapshot.state == TaskState.success) {
-        // Small delay to ensure consistency
-        await Future.delayed(const Duration(milliseconds: 500));
-        
-        final downloadUrl = await snapshot.ref.getDownloadURL();
-        await user.updatePhotoURL(downloadUrl);
-        await user.reload(); 
-
-        // --- UPDATE FIRESTORE DOCUMENTS ---
-        final db = FirebaseFirestore.instance;
-        final batch = db.batch(); // Use batch for atomicity
-
-        // 1. Update rides where I am the driver
-        final ridesQuery = await db.collection('rides').where('driverId', isEqualTo: user.uid).get();
-        for (var doc in ridesQuery.docs) {
-          batch.update(doc.reference, {'driverPhotoUrl': downloadUrl});
-        }
-
-        // 2. Update bookings where I am the passenger
-        final passengerBookings = await db.collection('bookings').where('passengerId', isEqualTo: user.uid).get();
-        for (var doc in passengerBookings.docs) {
-          batch.update(doc.reference, {'passengerPhotoUrl': downloadUrl});
-        }
-
-        // 3. Update bookings where I am the driver
-        final driverBookings = await db.collection('bookings').where('driverId', isEqualTo: user.uid).get();
-        for (var doc in driverBookings.docs) {
-          batch.update(doc.reference, {'driverPhotoUrl': downloadUrl});
-        }
-
-        await batch.commit();
-        // ----------------------------------
-        
-        if (mounted) {
-          setState(() {}); 
-          _showSnackBar("Photo de profil mise à jour et synchronisée !", Colors.green);
-        }
-      } else {
-         throw Exception("Statut upload incorrect: ${snapshot.state}");
+      if (mounted) {
+        setState(() {});
+        _showSnackBar("Photo de profil mise Ã  jour et synchronisÃ©e !", Colors.green);
       }
     } catch (e) {
       // Check for specific firebase error
       String errorMsg = "Erreur upload: $e";
       if (e.toString().contains("object-not-found")) {
-        errorMsg = "Erreur: Le fichier n'a pas été créé. Vérifiez vos Règles de Stockage Firebase.";
+        errorMsg = "Erreur: Le fichier n'a pas Ã©tÃ© crÃ©Ã©. VÃ©rifiez vos RÃ¨gles de Stockage Firebase.";
       } else if (e.toString().contains("unauthorized")) {
-         errorMsg = "Erreur: Permission refusée. Vérifiez vos Règles de Stockage.";
+         errorMsg = "Erreur: Permission refusÃ©e. VÃ©rifiez vos RÃ¨gles de Stockage.";
       }
       _showSnackBar(errorMsg, Colors.redAccent);
     } finally {
@@ -153,18 +106,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isSaving = true);
     setState(() => _isSaving = true);
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        // Update display name
-        await user.updateDisplayName(newName);
-        await user.reload();
-        
-        // Save Phone Number to Firestore
-        final phone = _phoneController.text.trim();
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'phoneNumber': phone,
-        }, SetOptions(merge: true));
-      }
+      final phone = _phoneController.text.trim();
+      await ProfileService().updateDisplayNameAndPhone(
+        name: newName,
+        phoneNumber: phone,
+      );
 
       if (!context.mounted) return;
       _showSnackBar(Translations.getText(context, 'profile_updated'), Colors.green);
@@ -409,3 +355,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 }
+

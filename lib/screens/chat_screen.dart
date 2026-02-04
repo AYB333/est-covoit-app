@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../widgets/user_avatar.dart';
 import '../services/notification_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/booking.dart';
+import '../models/chat_message.dart';
+import '../models/ride.dart';
+import '../repositories/booking_repository.dart';
+import '../repositories/chat_repository.dart';
+import '../repositories/ride_repository.dart';
+import '../repositories/user_repository.dart';
 
 class ChatScreen extends StatefulWidget {
   final String bookingId;
@@ -42,15 +48,13 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
 
     try {
-      await FirebaseFirestore.instance
-          .collection('bookings')
-          .doc(widget.bookingId)
-          .collection('messages')
-          .add({
-        'text': text,
-        'senderId': currentUserId,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+      final message = ChatMessage(
+        id: '',
+        text: text,
+        senderId: currentUserId,
+        timestamp: null,
+      );
+      await ChatRepository().sendMessage(widget.bookingId, message);
       
       // Notify Other User
       NotificationService.sendNotification(
@@ -83,12 +87,7 @@ class _ChatScreenState extends State<ChatScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await FirebaseFirestore.instance
-                  .collection('bookings')
-                  .doc(widget.bookingId)
-                  .collection('messages')
-                  .doc(messageId)
-                  .delete();
+              await ChatRepository().deleteMessage(widget.bookingId, messageId);
             }, 
             child: const Text("Supprimer", style: TextStyle(color: Colors.red))
           ),
@@ -99,19 +98,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _callUser() async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(widget.otherUserId).get();
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data() as Map<String, dynamic>;
-        if (data.containsKey('phoneNumber') && data['phoneNumber'].toString().isNotEmpty) {
-           final Uri url = Uri.parse("tel:${data['phoneNumber']}");
-           if (await canLaunchUrl(url)) {
-             await launchUrl(url);
-           } else {
-             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Action impossible")));
-           }
-        } else {
-           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Numéro non disponible")));
-        }
+      final phone = await UserRepository().fetchPhoneNumber(widget.otherUserId);
+      if (phone != null && phone.isNotEmpty) {
+         final Uri url = Uri.parse("tel:$phone");
+         if (await canLaunchUrl(url)) {
+           await launchUrl(url);
+         } else {
+           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Action impossible")));
+         }
+      } else {
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Numéro non disponible")));
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
@@ -123,33 +119,30 @@ class _ChatScreenState extends State<ChatScreen> {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.collection('bookings').doc(widget.bookingId).snapshots(),
+        title: StreamBuilder<Booking?>(
+          stream: BookingRepository().streamBooking(widget.bookingId),
           builder: (context, snapshot) {
             String? photoUrl = widget.otherUserPhotoUrl;
             String name = widget.otherUserName;
 
-            if (snapshot.hasData && snapshot.data != null && snapshot.data!.exists) {
-              final data = snapshot.data!.data() as Map<String, dynamic>;
-              if (data['driverId'] == widget.otherUserId) {
-                photoUrl = data['driverPhotoUrl'];
-                name = data['driverName'] ?? name;
-              } else if (data['passengerId'] == widget.otherUserId) {
-                 photoUrl = data['passengerPhotoUrl'];
-                 name = data['passengerName'] ?? name;
+            final booking = snapshot.data;
+            if (booking != null) {
+              if (booking.driverId == widget.otherUserId) {
+                photoUrl = booking.driverPhotoUrl;
+                name = booking.driverName ?? name;
+              } else if (booking.passengerId == widget.otherUserId) {
+                 photoUrl = booking.passengerPhotoUrl;
+                 name = booking.passengerName;
               }
-              
+
               // Fallback if photo missing
-              if (photoUrl == null || photoUrl!.isEmpty) {
-                 return StreamBuilder<DocumentSnapshot>(
-                   stream: FirebaseFirestore.instance.collection('rides').doc(data['rideId']).snapshots(),
+              if (photoUrl == null || photoUrl.isEmpty) {
+                 return StreamBuilder<Ride?>(
+                   stream: RideRepository().streamRide(booking.rideId),
                    builder: (context, rideSnap) {
-                     if (rideSnap.hasData && rideSnap.data != null && rideSnap.data!.exists) {
-                       final rideData = rideSnap.data!.data() as Map<String, dynamic>;
-                       // Only use if it matches the other user (Driver)
-                       if (data['driverId'] == widget.otherUserId) {
-                          photoUrl = rideData['driverPhotoUrl'];
-                       }
+                     final ride = rideSnap.data;
+                     if (ride != null && booking.driverId == widget.otherUserId) {
+                        photoUrl = ride.driverPhotoUrl;
                      }
                      return Row(
                       children: [
@@ -158,7 +151,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           imageUrl: photoUrl,
                           radius: 18,
                           backgroundColor: scheme.primary.withOpacity(0.18),
-                  textColor: scheme.onPrimary,
+                          textColor: scheme.onPrimary,
                           fontSize: 14,
                         ),
                         const SizedBox(width: 10),
@@ -212,19 +205,14 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           children: [
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('bookings')
-                    .doc(widget.bookingId)
-                    .collection('messages')
-                    .orderBy('timestamp', descending: false)
-                    .snapshots(),
+              child: StreamBuilder<List<ChatMessage>>(
+                stream: ChatRepository().streamMessages(widget.bookingId),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -243,24 +231,23 @@ class _ChatScreenState extends State<ChatScreen> {
                     }
                   });
 
-                  final messages = snapshot.data!.docs;
+                  final messages = snapshot.data!;
 
                   return ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
-                      final doc = messages[index];
-                      final data = doc.data() as Map<String, dynamic>;
-                      final bool isMe = data['senderId'] == currentUserId;
-                      final String text = data['text'] ?? '';
-                      final Timestamp? ts = data['timestamp'] as Timestamp?;
-                      final String time = ts != null ? DateFormat('HH:mm').format(ts.toDate()) : '...';
+                      final msg = messages[index];
+                      final bool isMe = msg.senderId == currentUserId;
+                      final String text = msg.text;
+                      final DateTime? ts = msg.timestamp;
+                      final String time = ts != null ? DateFormat('HH:mm').format(ts) : '...';
 
                       return Align(
                         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                         child: InkWell(
-                          onLongPress: isMe ? () => _deleteMessage(doc.id) : null,
+                          onLongPress: isMe ? () => _deleteMessage(msg.id) : null,
                           borderRadius: BorderRadius.circular(15),
                           child: Container(
                             margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
@@ -369,3 +356,5 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+
+

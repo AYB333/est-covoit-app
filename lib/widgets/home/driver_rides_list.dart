@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +8,10 @@ import '../../screens/chat_screen.dart';
 import '../../screens/ride_details_screen.dart';
 import '../../services/notification_service.dart';
 import '../user_avatar.dart';
+import '../../models/ride.dart';
+import '../../models/booking.dart';
+import '../../repositories/booking_repository.dart';
+import '../../repositories/ride_repository.dart';
 
 class DriverRidesList extends StatefulWidget {
   const DriverRidesList({super.key});
@@ -24,15 +27,11 @@ class _DriverRidesListState extends State<DriverRidesList> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Center(child: Text("Non connecté"));
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('rides')
-          .where('driverId', isEqualTo: user.uid)
-          .orderBy('date', descending: true)
-          .snapshots(),
+    return StreamBuilder<List<Ride>>(
+      stream: RideRepository().streamDriverRides(user.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -45,16 +44,15 @@ class _DriverRidesListState extends State<DriverRidesList> {
           );
         }
 
-        final rides = snapshot.data!.docs;
+        final rides = snapshot.data!;
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: rides.length,
           itemBuilder: (context, index) {
-            final rideDoc = rides[index];
-            final data = rideDoc.data() as Map<String, dynamic>;
-            final date = (data['date'] as Timestamp).toDate();
-            final seats = (data['seats'] as num?)?.toInt() ?? 0;
+            final ride = rides[index];
+            final date = ride.date;
+            final seats = ride.seats;
 
             return Card(
               margin: const EdgeInsets.only(bottom: 15),
@@ -65,7 +63,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
                   ListTile(
                     contentPadding: const EdgeInsets.all(15),
                     title: Text(
-                      "${data['departureAddress'] ?? Translations.getText(context, 'departure')} \u2192 EST",
+                      "${ride.departureAddress ?? Translations.getText(context, 'departure')} \u2192 EST",
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -105,11 +103,11 @@ class _DriverRidesListState extends State<DriverRidesList> {
                               MaterialPageRoute(
                                 builder: (context) => RideDetailsScreen(
                                   startLocation: LatLng(
-                                    data['startLat'] ?? 30.4000,
-                                    data['startLng'] ?? -9.6000,
+                                    ride.startLat == 0 ? 30.4000 : ride.startLat,
+                                    ride.startLng == 0 ? -9.6000 : ride.startLng,
                                   ),
-                                  rideId: rideDoc.id,
-                                  rideData: data,
+                                  rideId: ride.id,
+                                  rideData: ride.toMap(),
                                 ),
                               ),
                             );
@@ -123,18 +121,14 @@ class _DriverRidesListState extends State<DriverRidesList> {
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                           ),
-                          onPressed: () => _deleteRide(rideDoc.id),
+                          onPressed: () => _deleteRide(ride.id),
                         ),
-                        StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('bookings')
-                              .where('rideId', isEqualTo: rideDoc.id)
-                              .where('status', isEqualTo: 'pending')
-                              .snapshots(),
+                        StreamBuilder<List<Booking>>(
+                          stream: BookingRepository().streamPendingBookings(ride.id),
                           builder: (context, snap) {
                             int count = 0;
                             if (snap.hasData) {
-                              count = snap.data!.docs.length;
+                              count = snap.data!.length;
                             }
 
                             return TextButton.icon(
@@ -157,7 +151,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                               ),
-                              onPressed: () => _showRequestsModal(context, rideDoc.id),
+                              onPressed: () => _showRequestsModal(context, ride.id),
                             );
                           },
                         ),
@@ -193,32 +187,24 @@ class _DriverRidesListState extends State<DriverRidesList> {
     if (confirm != true) return;
 
     try {
-      final batch = FirebaseFirestore.instance.batch();
-      final rideRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
+      final bookingRepo = BookingRepository();
+      final rideRepo = RideRepository();
 
       // Get all bookings for this ride
-      final bookingsQuery =
-          await FirebaseFirestore.instance.collection('bookings').where('rideId', isEqualTo: rideId).get();
-
-      for (var doc in bookingsQuery.docs) {
-        final data = doc.data();
+      final bookings = await bookingRepo.fetchBookingsForRide(rideId);
+      for (var booking in bookings) {
         // Notify Passenger if booking was pending or accepted
-        if (data['status'] == 'pending' || data['status'] == 'accepted') {
+        if (booking.status == 'pending' || booking.status == 'accepted') {
           NotificationService.sendNotification(
-            receiverId: data['passengerId'],
+            receiverId: booking.passengerId,
             title: "Trajet Annulé",
-            body: "Le conducteur a annulé le trajet ${data['departureAddress'] ?? ''}.",
+            body: "Le conducteur a annulé le trajet ${booking.departureAddress ?? ''}.",
             type: "ride_cancel",
           );
         }
-        // Delete booking
-        batch.delete(doc.reference);
       }
 
-      // Delete ride
-      batch.delete(rideRef);
-
-      await batch.commit();
+      await rideRepo.deleteRideAndBookings(rideId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trajet supprimé.")));
@@ -244,23 +230,21 @@ class _DriverRidesListState extends State<DriverRidesList> {
               const Text("Demandes de réservation", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const Divider(),
               Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance.collection('bookings').where('rideId', isEqualTo: rideId).snapshots(),
+                child: StreamBuilder<List<Booking>>(
+                  stream: BookingRepository().streamRideBookings(rideId),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
                       return const Center(child: Text("Aucune demande."));
                     }
 
                     // Client-side Sort: Pending first, then Accepted, then Rejected
-                    final requests = snapshot.data!.docs;
+                    final requests = snapshot.data!;
                     requests.sort((a, b) {
-                      final da = a.data() as Map<String, dynamic>;
-                      final db = b.data() as Map<String, dynamic>;
-                      final sa = da['status'] ?? 'pending';
-                      final sb = db['status'] ?? 'pending';
+                      final sa = a.status.isEmpty ? 'pending' : a.status;
+                      final sb = b.status.isEmpty ? 'pending' : b.status;
 
                       // Custom order: pending < accepted < rejected
                       int order(String s) {
@@ -275,9 +259,8 @@ class _DriverRidesListState extends State<DriverRidesList> {
                       itemCount: requests.length,
                       itemBuilder: (context, index) {
                         final req = requests[index];
-                        final rData = req.data() as Map<String, dynamic>;
-                        final status = rData['status'] ?? 'pending';
-                        final passengerName = rData['passengerName'] ?? 'Passager';
+                        final status = req.status.isEmpty ? 'pending' : req.status;
+                        final passengerName = req.passengerName;
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 10),
@@ -289,7 +272,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
                               children: [
                                 UserAvatar(
                                   userName: passengerName,
-                                  imageUrl: rData['passengerPhotoUrl'],
+                                  imageUrl: req.passengerPhotoUrl,
                                   radius: 20,
                                   backgroundColor: Colors.purple[50],
                                   textColor: Colors.purple[800],
@@ -319,12 +302,12 @@ class _DriverRidesListState extends State<DriverRidesList> {
                                 if (status == 'pending') ...[
                                   IconButton(
                                     icon: Icon(Icons.check_circle, color: scheme.secondary, size: 30),
-                                    onPressed: () => _handleBooking(req.id, rideId, true, rData['passengerId']),
+                                    onPressed: () => _handleBooking(req.id, rideId, true, req.passengerId),
                                     tooltip: "Accepter",
                                   ),
                                   IconButton(
                                     icon: Icon(Icons.cancel, color: scheme.error, size: 30),
-                                    onPressed: () => _handleBooking(req.id, rideId, false, rData['passengerId']),
+                                    onPressed: () => _handleBooking(req.id, rideId, false, req.passengerId),
                                     tooltip: "Refuser",
                                   ),
                                 ] else if (status == 'accepted') ...[
@@ -338,8 +321,8 @@ class _DriverRidesListState extends State<DriverRidesList> {
                                           builder: (_) => ChatScreen(
                                             bookingId: req.id,
                                             otherUserName: passengerName,
-                                            otherUserId: rData['passengerId'],
-                                            otherUserPhotoUrl: rData['passengerPhotoUrl'],
+                                            otherUserId: req.passengerId,
+                                            otherUserPhotoUrl: req.passengerPhotoUrl,
                                           ),
                                         ),
                                       );
@@ -368,29 +351,10 @@ class _DriverRidesListState extends State<DriverRidesList> {
   Future<void> _handleBooking(String bookingId, String rideId, bool accept, String passengerId) async {
     if (accept) {
       try {
-        final rideRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
-        final bookingRef = FirebaseFirestore.instance.collection('bookings').doc(bookingId);
-
-        await FirebaseFirestore.instance.runTransaction((transaction) async {
-          final rideSnap = await transaction.get(rideRef);
-          if (!rideSnap.exists) throw StateError('ride-missing');
-
-          final bookingSnap = await transaction.get(bookingRef);
-          if (!bookingSnap.exists) throw StateError('booking-missing');
-
-          final bookingData = bookingSnap.data() as Map<String, dynamic>;
-          final status = bookingData['status'] ?? 'pending';
-          if (status != 'pending') throw StateError('booking-not-pending');
-
-          final seats = (rideSnap.data()?['seats'] as num?)?.toInt() ?? 0;
-          if (seats <= 0) throw StateError('no-seats');
-
-          transaction.update(bookingRef, {
-            'status': 'accepted',
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-          transaction.update(rideRef, {'seats': seats - 1});
-        });
+        await BookingRepository().acceptBookingWithSeatUpdate(
+          bookingId: bookingId,
+          rideId: rideId,
+        );
 
         // Notify Passenger
         NotificationService.sendNotification(
@@ -424,12 +388,11 @@ class _DriverRidesListState extends State<DriverRidesList> {
       }
     } else {
       try {
-        final bookingRef = FirebaseFirestore.instance.collection('bookings').doc(bookingId);
-        final bookingSnap = await bookingRef.get();
-        if (!bookingSnap.exists) return;
+        final bookingRepo = BookingRepository();
+        final booking = await bookingRepo.fetchBooking(bookingId);
+        if (booking == null) return;
 
-        final bookingData = bookingSnap.data() as Map<String, dynamic>;
-        final status = bookingData['status'] ?? 'pending';
+        final status = booking.status.isEmpty ? 'pending' : booking.status;
         if (status != 'pending') {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Demande deja traitee.")));
@@ -437,10 +400,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
           return;
         }
 
-        await bookingRef.update({
-          'status': 'rejected',
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+        await bookingRepo.rejectBooking(bookingId);
 
         // Notify Passenger
         NotificationService.sendNotification(
@@ -455,3 +415,5 @@ class _DriverRidesListState extends State<DriverRidesList> {
     }
   }
 }
+
+
