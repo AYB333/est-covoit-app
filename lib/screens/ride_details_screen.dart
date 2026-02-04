@@ -518,7 +518,10 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
               onTap: _handleMapTap,
             ),
             children: [
-              TileLayer(urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.est_covoit',
+              ),
               if (_routePoints.isNotEmpty)
                 PolylineLayer(polylines: [Polyline(points: _routePoints, color: scheme.primary, strokeWidth: 5.0)]),
               MarkerLayer(markers: [

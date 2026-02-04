@@ -116,7 +116,10 @@ class _RideMapViewerState extends State<RideMapViewer> {
               initialZoom: 13.0,
             ),
             children: [
-              TileLayer(urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.est_covoit',
+              ),
               if (widget.polylinePoints.isNotEmpty)
                 PolylineLayer(
                   polylines: [
@@ -201,5 +204,3 @@ class _RideMapViewerState extends State<RideMapViewer> {
     );
   }
 }
-
-

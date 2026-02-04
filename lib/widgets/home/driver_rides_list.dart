@@ -22,7 +22,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const Center(child: Text("Non connectÃ©"));
+    if (user == null) return const Center(child: Text("Non connecté"));
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -179,7 +179,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text("Supprimer"),
-        content: const Text("Voulez-vous supprimer ce trajet ?\nCela annulera toutes les rÃ©servations associÃ©es."),
+        content: const Text("Voulez-vous supprimer ce trajet ?\nCela annulera toutes les réservations associées."),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler")),
           TextButton(
@@ -206,8 +206,8 @@ class _DriverRidesListState extends State<DriverRidesList> {
         if (data['status'] == 'pending' || data['status'] == 'accepted') {
           NotificationService.sendNotification(
             receiverId: data['passengerId'],
-            title: "Trajet AnnulÃ©",
-            body: "Le conducteur a annulÃ© le trajet ${data['departureAddress'] ?? ''}.",
+            title: "Trajet Annulé",
+            body: "Le conducteur a annulé le trajet ${data['departureAddress'] ?? ''}.",
             type: "ride_cancel",
           );
         }
@@ -221,7 +221,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
       await batch.commit();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trajet supprimÃ©.")));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trajet supprimé.")));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
@@ -241,7 +241,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Demandes de rÃ©servation", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text("Demandes de réservation", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const Divider(),
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
@@ -302,7 +302,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
                                       Text(passengerName,
                                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                       Text(
-                                        status == 'pending' ? 'En attente' : status == 'accepted' ? 'AcceptÃ©' : 'RefusÃ©',
+                                        status == 'pending' ? 'En attente' : status == 'accepted' ? 'Accepté' : 'Refusé',
                                         style: TextStyle(
                                           color: status == 'pending'
                                               ? scheme.tertiary
