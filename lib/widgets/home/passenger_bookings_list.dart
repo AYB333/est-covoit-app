@@ -23,7 +23,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const Center(child: Text("Non connectÃ©"));
+    if (user == null) return const Center(child: Text("Non connecté"));
 
     return StreamBuilder<List<Booking>>(
       stream: BookingRepository().streamPassengerBookings(user.uid),

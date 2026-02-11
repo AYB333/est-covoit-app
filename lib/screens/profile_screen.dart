@@ -80,15 +80,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (mounted) {
         setState(() {});
-        _showSnackBar("Photo de profil mise Ã  jour et synchronisÃ©e !", Colors.green);
+        _showSnackBar("Photo de profil mise à jour et synchronisée !", Colors.green);
       }
     } catch (e) {
       // Check for specific firebase error
       String errorMsg = "Erreur upload: $e";
       if (e.toString().contains("object-not-found")) {
-        errorMsg = "Erreur: Le fichier n'a pas Ã©tÃ© crÃ©Ã©. VÃ©rifiez vos RÃ¨gles de Stockage Firebase.";
+        errorMsg = "Erreur: Le fichier n'a pas été créé. Vérifiez vos Règles de Stockage Firebase.";
       } else if (e.toString().contains("unauthorized")) {
-         errorMsg = "Erreur: Permission refusÃ©e. VÃ©rifiez vos RÃ¨gles de Stockage.";
+         errorMsg = "Erreur: Permission refusée. Vérifiez vos Règles de Stockage.";
       }
       _showSnackBar(errorMsg, Colors.redAccent);
     } finally {
