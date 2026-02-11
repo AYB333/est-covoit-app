@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:est_covoit/screens/signup_screen.dart';
 import 'package:est_covoit/screens/home_screen.dart';
+import '../config/translations.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -26,12 +27,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showError("Veuillez remplir tous les champs.");
+      _showError(Translations.getText(context, 'error_fill_fields'));
       return;
     }
 
     if (!_emailController.text.trim().endsWith("@edu.uiz.ac.ma")) {
-      _showError("Veuillez utiliser votre email academique (@edu.uiz.ac.ma).");
+      _showError(Translations.getText(context, 'error_email_domain'));
       return;
     }
 
@@ -48,15 +49,15 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (context) => const DashboardScreen()),
       );
     } on FirebaseAuthException catch (e) {
-      String message = "Une erreur est survenue.";
+      String message = Translations.getText(context, 'login_error_generic');
       if (e.code == 'user-not-found') {
-        message = "Aucun compte trouve avec cet email.";
+        message = Translations.getText(context, 'login_error_user_not_found');
       } else if (e.code == 'wrong-password') {
-        message = "Mot de passe incorrect.";
+        message = Translations.getText(context, 'login_error_wrong_password');
       } else if (e.code == 'invalid-email') {
-        message = "L'adresse email est invalide.";
+        message = Translations.getText(context, 'login_error_invalid_email');
       } else if (e.code == 'too-many-requests') {
-        message = "Trop de tentatives. Reessayez plus tard.";
+        message = Translations.getText(context, 'login_error_too_many_requests');
       }
       _showError(message);
     } finally {
@@ -149,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Text('EST-Covoit', style: textTheme.displaySmall?.copyWith(color: Colors.white)),
                     const SizedBox(height: 6),
                     Text(
-                      'Covoiturage des etudiants',
+                      Translations.getText(context, 'app_tagline'),
                       style: textTheme.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.85)),
                     ),
                     const SizedBox(height: 28),
@@ -161,19 +162,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text('Bienvenue', style: textTheme.titleLarge),
+                            Text(Translations.getText(context, 'login_welcome'), style: textTheme.titleLarge),
                             const SizedBox(height: 6),
                             Text(
-                              'Connectez-vous pour continuer',
+                              Translations.getText(context, 'login_subtitle'),
                               style: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                             ),
                             const SizedBox(height: 24),
                             TextField(
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
-                              decoration: const InputDecoration(
-                                labelText: 'Email etudiant',
-                                prefixIcon: Icon(Icons.email_outlined),
+                              decoration: InputDecoration(
+                                labelText: Translations.getText(context, 'student_email'),
+                                prefixIcon: const Icon(Icons.email_outlined),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -181,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               controller: _passwordController,
                               obscureText: _obscurePassword,
                               decoration: InputDecoration(
-                                labelText: 'Mot de passe',
+                                labelText: Translations.getText(context, 'password_hint'),
                                 prefixIcon: const Icon(Icons.lock_outline),
                                 suffixIcon: IconButton(
                                   icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
@@ -200,14 +201,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                         height: 22,
                                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                                       )
-                                    : const Text('Se connecter'),
+                                    : Text(Translations.getText(context, 'login_btn')),
                               ),
                             ),
                             const SizedBox(height: 14),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text("Pas encore de compte ?", style: textTheme.bodySmall),
+                                Text(Translations.getText(context, 'no_account'), style: textTheme.bodySmall),
                                 TextButton(
                                   onPressed: () {
                                     Navigator.push(
@@ -215,7 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       MaterialPageRoute(builder: (context) => const SignUpScreen()),
                                     );
                                   },
-                                  child: const Text("Creer un compte"),
+                                  child: Text(Translations.getText(context, 'register_link')),
                                 ),
                               ],
                             ),

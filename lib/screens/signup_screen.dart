@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../config/translations.dart';
 import '../widgets/user_avatar.dart';
 import '../services/auth_service.dart';
 
@@ -41,13 +42,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
         _emailController.text.isEmpty ||
         _passwordController.text.isEmpty ||
         _phoneController.text.isEmpty) {
-      _showError("Veuillez remplir tous les champs.");
+      _showError(Translations.getText(context, 'error_fill_fields'));
       return;
     }
 
     // Domain check: only academic email
     if (!_emailController.text.trim().endsWith("@edu.uiz.ac.ma")) {
-      _showError("Veuillez utiliser votre email academique (@edu.uiz.ac.ma).");
+      _showError(Translations.getText(context, 'error_email_domain'));
       return;
     }
 
@@ -68,11 +69,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
       // Success feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 10),
-              Expanded(child: Text("Compte cree ! Connectez-vous.", style: TextStyle(fontWeight: FontWeight.bold))),
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  Translations.getText(context, 'signup_success'),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
             ],
           ),
           backgroundColor: Colors.green,
@@ -87,13 +93,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
       // Back to login screen
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
-      String message = "Erreur d'inscription.";
+      String message = Translations.getText(context, 'signup_error_generic');
       if (e.code == 'email-already-in-use') {
-        message = "Cet email est deja utilise.";
+        message = Translations.getText(context, 'signup_error_email_in_use');
       } else if (e.code == 'weak-password') {
-        message = "Mot de passe trop faible (min 6 caracteres).";
+        message = Translations.getText(context, 'signup_error_weak_password');
       } else if (e.code == 'invalid-email') {
-        message = "Email invalide.";
+        message = Translations.getText(context, 'signup_error_invalid_email');
       }
       _showError(message);
     } finally {
@@ -176,11 +182,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     child: Column(
                       children: [
                         // Page title
-                        Text('Creer un compte', style: textTheme.displaySmall?.copyWith(color: Colors.white)),
+                        Text(
+                          Translations.getText(context, 'signup_title'),
+                          style: textTheme.displaySmall?.copyWith(color: Colors.white),
+                        ),
                         const SizedBox(height: 8),
                         // Subtitle
                         Text(
-                          'Rejoignez la communaute EST',
+                          Translations.getText(context, 'signup_subtitle'),
                           style: textTheme.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.85)),
                         ),
                         const SizedBox(height: 24),
@@ -208,7 +217,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                                 )
                                               : UserAvatar(
                                                   userName: _nameController.text.isEmpty
-                                                      ? "Nouveau"
+                                                      ? Translations.getText(context, 'new_user')
                                                       : _nameController.text,
                                                   radius: 46,
                                                   backgroundColor: scheme.surfaceVariant,
@@ -236,9 +245,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 // Full name
                                 TextField(
                                   controller: _nameController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Nom complet',
-                                    prefixIcon: Icon(Icons.person_outline),
+                                  decoration: InputDecoration(
+                                    labelText: Translations.getText(context, 'full_name'),
+                                    prefixIcon: const Icon(Icons.person_outline),
                                   ),
                                 ),
                                 const SizedBox(height: 16),
@@ -246,9 +255,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 TextField(
                                   controller: _emailController,
                                   keyboardType: TextInputType.emailAddress,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Email',
-                                    prefixIcon: Icon(Icons.email_outlined),
+                                  decoration: InputDecoration(
+                                    labelText: Translations.getText(context, 'email_field'),
+                                    prefixIcon: const Icon(Icons.email_outlined),
                                   ),
                                 ),
                                 const SizedBox(height: 16),
@@ -257,7 +266,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   controller: _passwordController,
                                   obscureText: _obscurePassword,
                                   decoration: InputDecoration(
-                                    labelText: 'Mot de passe',
+                                    labelText: Translations.getText(context, 'password_hint'),
                                     prefixIcon: const Icon(Icons.lock_outline),
                                     suffixIcon: IconButton(
                                       icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
@@ -270,9 +279,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 TextField(
                                   controller: _phoneController,
                                   keyboardType: TextInputType.phone,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Telephone',
-                                    prefixIcon: Icon(Icons.phone),
+                                  decoration: InputDecoration(
+                                    labelText: Translations.getText(context, 'phone_field'),
+                                    prefixIcon: const Icon(Icons.phone),
                                   ),
                                 ),
                                 const SizedBox(height: 24),
@@ -288,7 +297,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                             width: 22,
                                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                                           )
-                                        : const Text("S'inscrire"),
+                                        : Text(Translations.getText(context, 'sign_up')),
                                   ),
                                 ),
                               ],

@@ -114,18 +114,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _currentIndex = index;
           });
         },
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_rounded),
-            label: 'Accueil',
+            icon: const Icon(Icons.home_rounded),
+            label: Translations.getText(context, 'home_tab'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.list_alt_rounded),
-            label: 'Mes activites',
+            icon: const Icon(Icons.list_alt_rounded),
+            label: Translations.getText(context, 'my_activities'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings),
-            label: 'Parametres',
+            icon: const Icon(Icons.settings),
+            label: Translations.getText(context, 'settings_title'),
           ),
         ],
       ),
