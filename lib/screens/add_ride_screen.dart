@@ -4,7 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'ride_details_screen.dart';
+import 'package:est_covoit/screens/ride_details_screen.dart';
 import 'find_ride_screen.dart';
 
 class AddRideScreen extends StatefulWidget {

@@ -5,7 +5,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../config/translations.dart';
 import '../../screens/chat_screen.dart';
-import '../../screens/ride_details_screen.dart';
+import 'package:est_covoit/screens/ride_details_screen.dart';
 import '../../services/notification_service.dart';
 import '../user_avatar.dart';
 import '../../models/ride.dart';

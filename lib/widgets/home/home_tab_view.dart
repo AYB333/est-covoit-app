@@ -3,7 +3,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../config/translations.dart';
 import '../../screens/add_ride_screen.dart';
-import '../../screens/ride_details_screen.dart';
+import 'package:est_covoit/screens/ride_details_screen.dart';
 import 'home_header.dart';
 import 'home_role_card.dart';
 

@@ -338,14 +338,14 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      _isEditing ? 'Modifier le trajet' : 'Confirmer les détails du trajet', 
+                      _isEditing ? 'Modifier le trajet' : 'Confirmer les dÃ©tails du trajet', 
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: scheme.primary), 
                       textAlign: TextAlign.center
                     ),
                     const SizedBox(height: 20),
 
                     // 1. VEHICULE
-                    const Text('Type de véhicule', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('Type de vÃ©hicule', style: TextStyle(fontWeight: FontWeight.bold)),
                     Row(
                       children: [
                         Expanded(child: RadioListTile<String>(
@@ -376,7 +376,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                         ),
                       ],
                     ),
-                    Center(child: Text('Prix autorisé : $_minPrice - $_maxPrice MAD', style: const TextStyle(fontSize: 12, color: Colors.grey))),
+                    Center(child: Text('Prix autorisÃ© : $_minPrice - $_maxPrice MAD', style: const TextStyle(fontSize: 12, color: Colors.grey))),
                     const SizedBox(height: 15),
 
                     // 4. DATE
@@ -397,7 +397,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
 
                     // 5. SIEGES
                     if (_selectedVehicle == 'Voiture') ...[
-                      Text('Nombre de sièges: ${_seats.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Nombre de siÃ¨ges: ${_seats.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold)),
                       Slider(
                         value: _seats, min: 1, max: 4, divisions: 3,
                         activeColor: scheme.primary,
@@ -459,10 +459,10 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         final repo = RideRepository();
         if (_isEditing) {
            await repo.updateRide(widget.rideId!, ride);
-           _showSnackBar('Trajet modifi� avec succ�s !', Colors.green);
+           _showSnackBar('Trajet modifié avec succès !', Colors.green);
         } else {
            await repo.createRide(ride);
-           _showSnackBar('Trajet publi� avec succ�s !', Colors.green);
+           _showSnackBar('Trajet publié avec succès !', Colors.green);
         }
 if (mounted) Navigator.pop(context); // Revenir au Dashboard
       }
