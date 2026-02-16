@@ -80,15 +80,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (mounted) {
         setState(() {});
-        _showSnackBar("Photo de profil mise à jour et synchronisée !", Colors.green);
+        _showSnackBar(Translations.getText(context, 'profile_photo_updated'), Colors.green);
       }
     } catch (e) {
       // Check for specific firebase error
-      String errorMsg = "Erreur upload: $e";
+      String errorMsg = "${Translations.getText(context, 'upload_error_prefix')} $e";
       if (e.toString().contains("object-not-found")) {
-        errorMsg = "Erreur: Le fichier n'a pas été créé. Vérifiez vos Règles de Stockage Firebase.";
+        errorMsg = Translations.getText(context, 'upload_error_not_found');
       } else if (e.toString().contains("unauthorized")) {
-         errorMsg = "Erreur: Permission refusée. Vérifiez vos Règles de Stockage.";
+         errorMsg = Translations.getText(context, 'upload_error_permission');
       }
       _showSnackBar(errorMsg, Colors.redAccent);
     } finally {
@@ -99,7 +99,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveName() async {
     final newName = _nameController.text.trim();
     if (newName.isEmpty) {
-      _showSnackBar('Le nom ne peut pas être vide', Colors.redAccent);
+      _showSnackBar(Translations.getText(context, 'name_empty_error'), Colors.redAccent);
       return;
     }
 
@@ -115,7 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!context.mounted) return;
       _showSnackBar(Translations.getText(context, 'profile_updated'), Colors.green);
     } catch (e) {
-      _showSnackBar('Erreur: ${e.toString()}', Colors.redAccent);
+      _showSnackBar("${Translations.getText(context, 'error_prefix')} ${e.toString()}", Colors.redAccent);
     } finally {
       setState(() => _isSaving = false);
     }
@@ -141,7 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
                       labelText: Translations.getText(context, 'password_field'),
-                      hintText: 'Min 6 caractères',
+                      hintText: Translations.getText(context, 'password_min_hint'),
                       suffixIcon: IconButton(
                         icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -159,24 +159,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onPressed: () async {
                     final newPassword = passwordController.text.trim();
                     if (newPassword.length < 6) {
-                      _showSnackBar('Le mot de passe doit contenir au moins 6 caractères', Colors.redAccent);
+                      _showSnackBar(Translations.getText(context, 'password_min_error'), Colors.redAccent);
                       return;
                     }
                     try {
                       await FirebaseAuth.instance.currentUser?.updatePassword(newPassword);
                       if (!context.mounted) return;
                       Navigator.pop(context);
-                      _showSnackBar('Mot de passe changé', Colors.green);
+                      _showSnackBar(Translations.getText(context, 'password_changed'), Colors.green);
                     } on FirebaseAuthException catch (e) {
                       if (e.code == 'requires-recent-login') {
-                        _showSnackBar('Veuillez vous reconnecter pour changer le mot de passe', Colors.redAccent);
+                        _showSnackBar(Translations.getText(context, 'reauth_required'), Colors.redAccent);
                       } else if (e.code == 'weak-password') {
-                        _showSnackBar('Mot de passe trop faible', Colors.redAccent);
+                        _showSnackBar(Translations.getText(context, 'weak_password'), Colors.redAccent);
                       } else {
-                        _showSnackBar('Erreur: ${e.message ?? e.code}', Colors.redAccent);
+                        _showSnackBar(
+                          "${Translations.getText(context, 'error_prefix')} ${e.message ?? e.code}",
+                          Colors.redAccent,
+                        );
                       }
                     } catch (e) {
-                      _showSnackBar('Erreur: ${e.toString()}', Colors.redAccent);
+                      _showSnackBar("${Translations.getText(context, 'error_prefix')} ${e.toString()}", Colors.redAccent);
                     }
                   },
                   child: Text(Translations.getText(context, 'save')),
@@ -284,9 +287,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 24),
 
             // Phone Field
-            const Text(
-              "Téléphone",
-              style: TextStyle(fontWeight: FontWeight.bold),
+            Text(
+              Translations.getText(context, 'phone_field'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             TextFormField(

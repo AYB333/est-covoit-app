@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../models/ride.dart';
 import '../repositories/ride_repository.dart';
+import '../config/translations.dart';
 
 class RideDetailsScreen extends StatefulWidget {
   final LatLng startLocation;
@@ -189,7 +190,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         _updatePriceBounds();
       }
     } catch (e) {
-      _showSnackBar('Erreur connexion carte', Colors.redAccent);
+      _showSnackBar(Translations.getText(context, 'map_connection_error'), Colors.redAccent);
     } finally {
       setState(() => _isLoadingMap = false);
     }
@@ -236,7 +237,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
 
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _showSnackBar('Veuillez activer le GPS', Colors.redAccent);
+        _showSnackBar(Translations.getText(context, 'gps_enable'), Colors.redAccent);
         await Geolocator.openLocationSettings();
         return;
       }
@@ -247,12 +248,12 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
       }
 
       if (permission == LocationPermission.denied) {
-        _showSnackBar('Permission localisation refusee.', Colors.redAccent);
+        _showSnackBar(Translations.getText(context, 'location_permission_denied'), Colors.redAccent);
         return;
       }
 
       if (permission == LocationPermission.deniedForever) {
-        _showSnackBar('Permission localisation refusee. Activez-la dans les parametres.', Colors.redAccent);
+        _showSnackBar(Translations.getText(context, 'location_permission_denied_forever'), Colors.redAccent);
         await Geolocator.openAppSettings();
         return;
       }
@@ -268,7 +269,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
       }
 
       if (position == null) {
-        _showSnackBar('Impossible de recuperer la position.', Colors.redAccent);
+        _showSnackBar(Translations.getText(context, 'location_unavailable'), Colors.redAccent);
         return;
       }
 
@@ -276,7 +277,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
       _mapController.move(loc, 13.0);
       _handleMapTap(TapPosition(Offset.zero, Offset.zero), loc);
     } catch (e) {
-      _showSnackBar('Erreur position: $e', Colors.redAccent);
+      _showSnackBar("${Translations.getText(context, 'location_error')} $e", Colors.redAccent);
     } finally {
       if (mounted) setState(() => _isLoadingLocation = false);
     }
@@ -338,23 +339,32 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      _isEditing ? 'Modifier le trajet' : 'Confirmer les détails du trajet', 
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: scheme.primary), 
-                      textAlign: TextAlign.center
+                      _isEditing
+                          ? Translations.getText(context, 'trip_edit_title')
+                          : Translations.getText(context, 'trip_confirm_details'),
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: scheme.primary),
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
 
                     // 1. VEHICULE
-                    const Text('Type de véhicule', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      Translations.getText(context, 'vehicle_type'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     Row(
                       children: [
                         Expanded(child: RadioListTile<String>(
-                          title: const Text('Voiture'), value: 'Voiture', groupValue: _selectedVehicle,
+                          title: Text(Translations.getText(context, 'vehicle_car')),
+                          value: 'Voiture',
+                          groupValue: _selectedVehicle,
                           activeColor: scheme.primary,
                           onChanged: (val) => update(() { _selectedVehicle = val!; _updatePriceBounds(); })
                         )),
                         Expanded(child: RadioListTile<String>(
-                          title: const Text('Moto'), value: 'Moto', groupValue: _selectedVehicle,
+                          title: Text(Translations.getText(context, 'vehicle_moto')),
+                          value: 'Moto',
+                          groupValue: _selectedVehicle,
                           activeColor: scheme.primary,
                           onChanged: (val) => update(() { _selectedVehicle = val!; _updatePriceBounds(); })
                         )),
@@ -362,7 +372,10 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                     ),
 
                     // 2. PRIX
-                    const Text('Prix du trajet', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      Translations.getText(context, 'trip_price'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     Row(
                       children: [
                         IconButton(
@@ -376,7 +389,12 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                         ),
                       ],
                     ),
-                    Center(child: Text('Prix autorisé : $_minPrice - $_maxPrice MAD', style: const TextStyle(fontSize: 12, color: Colors.grey))),
+                    Center(
+                      child: Text(
+                        "${Translations.getText(context, 'allowed_price')}: $_minPrice - $_maxPrice MAD",
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ),
                     const SizedBox(height: 15),
 
                     // 4. DATE
@@ -388,7 +406,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                         setModalState(() {}); 
                       },
                       decoration: InputDecoration(
-                        labelText: 'Date et heure du trajet',
+                        labelText: Translations.getText(context, 'trip_date_time'),
                         prefixIcon: const Icon(Icons.calendar_today),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
@@ -397,7 +415,10 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
 
                     // 5. SIEGES
                     if (_selectedVehicle == 'Voiture') ...[
-                      Text('Nombre de sièges: ${_seats.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        "${Translations.getText(context, 'seats_count')}: ${_seats.toInt()}",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       Slider(
                         value: _seats, min: 1, max: 4, divisions: 3,
                         activeColor: scheme.primary,
@@ -414,7 +435,12 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                       style: ElevatedButton.styleFrom(backgroundColor: scheme.primary, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                       child: _isLoadingPublish 
                         ? const CircularProgressIndicator(color: Colors.white) 
-                        : Text(_isEditing ? "Enregistrer les modifications" : "Publier le trajet", style: const TextStyle(fontSize: 18, color: Colors.white)),
+                        : Text(
+                            _isEditing
+                                ? Translations.getText(context, 'save_changes')
+                                : Translations.getText(context, 'publish_journey'),
+                            style: const TextStyle(fontSize: 18, color: Colors.white),
+                          ),
                     ),
                     const SizedBox(height: 20),
                   ],
@@ -429,7 +455,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
 
   Future<void> _publishRide() async {
     if (_selectedDate == null || _departureAddress == null) {
-      _showSnackBar('Veuillez remplir tous les champs', Colors.redAccent);
+      _showSnackBar(Translations.getText(context, 'error_fill_fields'), Colors.redAccent);
       return;
     }
 
@@ -441,7 +467,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                 final ride = Ride(
           id: widget.rideId ?? '',
           driverId: user.uid,
-          driverName: user.displayName ?? 'Utilisateur',
+          driverName: user.displayName ?? Translations.getText(context, 'user'),
           driverPhotoUrl: user.photoURL,
           vehicleType: _selectedVehicle,
           price: _price,
@@ -459,15 +485,15 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         final repo = RideRepository();
         if (_isEditing) {
            await repo.updateRide(widget.rideId!, ride);
-           _showSnackBar('Trajet modifié avec succès !', Colors.green);
+           _showSnackBar(Translations.getText(context, 'trip_modified_success'), Colors.green);
         } else {
            await repo.createRide(ride);
-           _showSnackBar('Trajet publié avec succès !', Colors.green);
+           _showSnackBar(Translations.getText(context, 'trip_published_success'), Colors.green);
         }
 if (mounted) Navigator.pop(context); // Revenir au Dashboard
       }
     } catch (e) {
-      _showSnackBar('Erreur: $e', Colors.redAccent);
+      _showSnackBar("${Translations.getText(context, 'error_prefix')} $e", Colors.redAccent);
     } finally {
       if (mounted) setState(() => _isLoadingPublish = false);
     }
@@ -489,7 +515,11 @@ if (mounted) Navigator.pop(context); // Revenir au Dashboard
         ),
       ),
       appBar: AppBar(
-        title: Text(_isEditing ? 'Modifier le trajet' : 'Proposer un trajet'),
+        title: Text(
+          _isEditing
+              ? Translations.getText(context, 'trip_edit_title')
+              : Translations.getText(context, 'propose_trip'),
+        ),
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
@@ -545,8 +575,10 @@ if (mounted) Navigator.pop(context); // Revenir au Dashboard
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: Text(
-                  _isEditing ? 'Confirmer les modifications' : 'Confirmer le trajet', 
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                  _isEditing
+                      ? Translations.getText(context, 'confirm_changes')
+                      : Translations.getText(context, 'confirm_journey'),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
             ),

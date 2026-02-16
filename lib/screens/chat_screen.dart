@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../widgets/user_avatar.dart';
 import '../services/notification_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../config/translations.dart';
 import '../models/booking.dart';
 import '../models/chat_message.dart';
 import '../models/ride.dart';
@@ -59,7 +60,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // Notify Other User
       NotificationService.sendNotification(
         receiverId: widget.otherUserId,
-        title: "Nouveau message",
+        title: Translations.getText(context, 'new_message_title'),
         body: text,
         type: "chat_message",
       );
@@ -72,7 +73,9 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("${Translations.getText(context, 'error_prefix')} $e")),
+      );
     }
   }
 
@@ -80,16 +83,22 @@ class _ChatScreenState extends State<ChatScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Supprimer"),
-        content: const Text("Supprimer ce message pour tout le monde ?"),
+        title: Text(Translations.getText(context, 'delete')),
+        content: Text(Translations.getText(context, 'delete_message_confirm')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Annuler")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(Translations.getText(context, 'cancel')),
+          ),
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
               await ChatRepository().deleteMessage(widget.bookingId, messageId);
             }, 
-            child: const Text("Supprimer", style: TextStyle(color: Colors.red))
+            child: Text(
+              Translations.getText(context, 'delete'),
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       )
@@ -104,13 +113,15 @@ class _ChatScreenState extends State<ChatScreen> {
          if (await canLaunchUrl(url)) {
            await launchUrl(url);
          } else {
-           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Action impossible")));
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Translations.getText(context, 'action_impossible'))));
          }
       } else {
-         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Numéro non disponible")));
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Translations.getText(context, 'number_unavailable'))));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("${Translations.getText(context, 'error_prefix')} $e")),
+      );
     }
   }
 
@@ -219,7 +230,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         children: [
                           Icon(Icons.chat_bubble_outline, size: 40, color: Colors.grey[400]),
                           const SizedBox(height: 10),
-                          Text("Dites bonjour à ${widget.otherUserName} 👋", style: TextStyle(color: Colors.grey[500])),
+                          Text(
+                            "${Translations.getText(context, 'say_hello')} ${widget.otherUserName} 👋",
+                            style: TextStyle(color: Colors.grey[500]),
+                          ),
                         ],
                       ),
                     );
@@ -257,7 +271,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               gradient: isMe 
                                   ? LinearGradient(colors: [scheme.primary, scheme.secondary], begin: Alignment.topLeft, end: Alignment.bottomRight)
                                   : null,
-                              color: isMe ? null : Colors.white,
+                              color: isMe ? null : scheme.surface,
                               boxShadow: [
                                 BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 3, offset: const Offset(0, 1))
                               ],
@@ -328,7 +342,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: TextField(
                         controller: _messageController,
                         decoration: InputDecoration(
-                          hintText: "Écrire un message...",
+                          hintText: Translations.getText(context, 'write_message_hint'),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           hintStyle: TextStyle(color: scheme.onSurfaceVariant),
@@ -356,5 +370,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+
 
 

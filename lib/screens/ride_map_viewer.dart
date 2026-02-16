@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/booking_service.dart';
+import '../config/translations.dart';
 
 class RideMapViewer extends StatefulWidget {
   final List<LatLng> polylinePoints;
@@ -40,15 +41,29 @@ class _RideMapViewerState extends State<RideMapViewer> {
     );
   }
 
+  String _bookingMessage(BookingCreateResult result) {
+    switch (result.status) {
+      case BookingCreateStatus.success:
+        return Translations.getText(context, 'booking_request_sent');
+      case BookingCreateStatus.alreadyExists:
+        return Translations.getText(context, 'booking_already_exists');
+      case BookingCreateStatus.invalidData:
+        return Translations.getText(context, 'booking_invalid_data');
+      case BookingCreateStatus.error:
+      default:
+        return Translations.getText(context, 'booking_error_generic');
+    }
+  }
+
   Future<void> _reserveRide() async {
     if (widget.rideId == null || widget.rideData == null) {
-      _showSnackBar("Erreur: Données du trajet manquantes.", Colors.red);
+      _showSnackBar(Translations.getText(context, 'error_trip_missing_data'), Colors.red);
       return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnackBar("Vous devez être connecté.", Colors.red);
+      _showSnackBar(Translations.getText(context, 'error_not_connected'), Colors.red);
       return;
     }
 
@@ -56,13 +71,16 @@ class _RideMapViewerState extends State<RideMapViewer> {
     bool? confirm = await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Confirmer la réservation"),
-        content: const Text("Voulez-vous envoyer une demande de réservation au conducteur ?"),
+        title: Text(Translations.getText(context, 'confirm_booking_title')),
+        content: Text(Translations.getText(context, 'confirm_booking_message')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(Translations.getText(context, 'cancel')),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("Confirmer"),
+            child: Text(Translations.getText(context, 'confirm')),
           ),
         ],
       ),
@@ -83,7 +101,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
       BookingCreateStatus.alreadyExists => scheme.tertiary,
       _ => scheme.error,
     };
-    _showSnackBar(result.message, color);
+    _showSnackBar(_bookingMessage(result), color);
   }
 
   @override
@@ -104,7 +122,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Trajet de ${widget.driverName}'),
+        title: Text("${Translations.getText(context, 'ride_of')} ${widget.driverName}"),
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
       ),
@@ -163,15 +181,21 @@ class _RideMapViewerState extends State<RideMapViewer> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Conducteur: ${widget.driverName}',
+                      "${Translations.getText(context, 'driver')}: ${widget.driverName}",
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: scheme.primary),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Prix: ${widget.price} MAD', style: const TextStyle(fontSize: 16, color: Colors.black87)),
-                        Text('Date: ${DateFormat('dd/MM HH:mm').format(widget.date)}', style: const TextStyle(fontSize: 16, color: Colors.black87)),
+                        Text(
+                          "${Translations.getText(context, 'price')}: ${widget.price} MAD",
+                          style: const TextStyle(fontSize: 16, color: Colors.black87),
+                        ),
+                        Text(
+                          "${Translations.getText(context, 'date')}: ${DateFormat('dd/MM HH:mm').format(widget.date)}",
+                          style: const TextStyle(fontSize: 16, color: Colors.black87),
+                        ),
                       ],
                     ),
                     
@@ -183,8 +207,10 @@ class _RideMapViewerState extends State<RideMapViewer> {
                           onPressed: seats > 0 ? _reserveRide : null,
                           icon: const Icon(Icons.bookmark_added, color: Colors.white),
                           label: Text(
-                            seats > 0 ? 'Réserver ce trajet' : 'Complet', 
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                            seats > 0
+                                ? Translations.getText(context, 'book_this_trip')
+                                : Translations.getText(context, 'full'),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: seats > 0 ? scheme.primary : scheme.surfaceVariant,

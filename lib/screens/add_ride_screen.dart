@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:est_covoit/screens/ride_details_screen.dart';
 import 'find_ride_screen.dart';
+import '../config/translations.dart';
 
 class AddRideScreen extends StatefulWidget {
   final bool isDriver;
@@ -35,7 +36,9 @@ class _AddRideScreenState extends State<AddRideScreen> {
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veuillez activer le GPS')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(Translations.getText(context, 'gps_enable'))),
+      );
       await Geolocator.openLocationSettings();
       setState(() => _isLoadingLocation = false);
       return;
@@ -68,7 +71,9 @@ class _AddRideScreenState extends State<AddRideScreen> {
       }
 
       if (position == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Impossible de recuperer la position.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(Translations.getText(context, 'location_unavailable'))),
+        );
         setState(() => _isLoadingLocation = false);
         return;
       }
@@ -81,7 +86,9 @@ class _AddRideScreenState extends State<AddRideScreen> {
       _handleMapTap(TapPosition(Offset.zero, Offset.zero), newPos);
     } catch (e) {
       setState(() => _isLoadingLocation = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur position: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("${Translations.getText(context, 'location_error')} $e")),
+      );
     }
   }
 
@@ -109,12 +116,12 @@ class _AddRideScreenState extends State<AddRideScreen> {
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur de routage: ${response.statusCode}')),
+          SnackBar(content: Text("${Translations.getText(context, 'routing_error')} ${response.statusCode}")),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur de connexion OSRM: $e')),
+        SnackBar(content: Text("${Translations.getText(context, 'osrm_connection_error')} $e")),
       );
     } finally {
       setState(() {
@@ -150,8 +157,12 @@ class _AddRideScreenState extends State<AddRideScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final String appBarTitle = widget.isDriver ? "Point de départ" : "Trajet vers EST";
-    final String buttonText = widget.isDriver ? "Confirmer le depart" : "Chercher";
+    final String appBarTitle = widget.isDriver
+        ? Translations.getText(context, 'departure_point')
+        : Translations.getText(context, 'trip_to_est');
+    final String buttonText = widget.isDriver
+        ? Translations.getText(context, 'confirm_departure')
+        : Translations.getText(context, 'search_btn');
     final scheme = Theme.of(context).colorScheme;
     final Color buttonColor = widget.isDriver ? scheme.primary : scheme.secondary;
 
@@ -248,10 +259,10 @@ class _AddRideScreenState extends State<AddRideScreen> {
                                 color: scheme.secondary.withOpacity(0.8),
                                 borderRadius: BorderRadius.circular(5),
                               ),
-                              child: const Text(
-                                'DÉPART',
-                                style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                              ),
+                            child: Text(
+                              Translations.getText(context, 'departure'),
+                              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                            ),
                             ),
                           ),
                         ],

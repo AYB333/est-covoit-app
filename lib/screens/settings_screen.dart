@@ -45,7 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await prefs.setBool('notifications_enabled', false);
         if (mounted) {
            ScaffoldMessenger.of(context).showSnackBar(
-             const SnackBar(content: Text("Permission refusée. Vérifiez les paramètres de votre téléphone.")),
+             SnackBar(content: Text(Translations.getText(context, 'notification_permission_denied'))),
            );
         }
       }
@@ -103,7 +103,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             child: SwitchListTile(
               title: Text(Translations.getText(context, 'dark_mode')),
-              subtitle: Text(isDarkMode ? 'Activé' : 'Désactivé'),
+              subtitle: Text(
+                Translations.getText(context, isDarkMode ? 'enabled' : 'disabled'),
+              ),
               value: isDarkMode,
               onChanged: (_) => themeService.toggleTheme(),
               secondary: Icon(isDarkMode ? Icons.dark_mode : Icons.light_mode),
@@ -129,7 +131,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 SwitchListTile(
                   title: Text(Translations.getText(context, 'notifications')),
-                  subtitle: Text(_notificationsEnabled ? 'Activées' : 'Désactivées'),
+                  subtitle: Text(
+                    Translations.getText(context, _notificationsEnabled ? 'enabled' : 'disabled'),
+                  ),
                   value: _notificationsEnabled,
                   onChanged: _toggleNotifications,
                   secondary: const Icon(Icons.notifications),
@@ -239,7 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: const Text('Support: Envoyez un email à aitomghar26@gmail.com'),
+                        content: Text(Translations.getText(context, 'support_contact_message')),
                         backgroundColor: scheme.primary,
                         behavior: SnackBarBehavior.floating,
                         margin: const EdgeInsets.all(16),
@@ -263,14 +267,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       context: context,
                       applicationName: 'EST-Covoit',
                       applicationVersion: '1.0.0',
-                      applicationLegalese: '© 2026 EST-Covoit. Tous droits réservés.',
+                      applicationLegalese: Translations.getText(context, 'app_legalese'),
                       children: [
-                        const Text(
-                          'EST-Covoit est une application de covoiturage conçue pour '
-                          'faciliter les trajets entre les étudiants et salariés. '
-                          'Partagez vos trajets, économisez, et contribuez à un transport '
-                          'plus écologique.',
-                        ),
+                        Text(Translations.getText(context, 'about_description')),
                       ],
                     );
                   },

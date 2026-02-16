@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../config/translations.dart';
+import '../../screens/profile_screen.dart';
 import '../user_avatar.dart';
 
 class HomeHeader extends StatelessWidget {
@@ -39,13 +40,21 @@ class HomeHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              UserAvatar(
-                userName: userName,
-                imageUrl: photoUrl ?? FirebaseAuth.instance.currentUser?.photoURL,
-                radius: 28,
-                backgroundColor: Colors.white,
-                textColor: scheme.primary,
-                fontSize: 22,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  );
+                },
+                child: UserAvatar(
+                  userName: userName,
+                  imageUrl: photoUrl ?? FirebaseAuth.instance.currentUser?.photoURL,
+                  radius: 28,
+                  backgroundColor: Colors.white,
+                  textColor: scheme.primary,
+                  fontSize: 22,
+                ),
               ),
               const SizedBox(width: 15),
               Column(

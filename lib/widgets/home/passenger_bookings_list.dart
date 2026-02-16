@@ -23,7 +23,9 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const Center(child: Text("Non connecté"));
+    if (user == null) {
+      return Center(child: Text(Translations.getText(context, 'not_connected')));
+    }
 
     return StreamBuilder<List<Booking>>(
       stream: BookingRepository().streamPassengerBookings(user.uid),
@@ -34,7 +36,11 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Text("Erreur: ${snapshot.error}", style: TextStyle(color: scheme.error), textAlign: TextAlign.center),
+              child: Text(
+                "${Translations.getText(context, 'error_prefix')} ${snapshot.error}",
+                style: TextStyle(color: scheme.error),
+                textAlign: TextAlign.center,
+              ),
             ),
           );
         }
@@ -101,7 +107,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
             }
 
             // Route
-            String route = "${booking.departureAddress ?? 'D\u00E9part'} \u2192 ${booking.rideDestination.isEmpty ? 'EST' : booking.rideDestination}";
+            String route = "${booking.departureAddress ?? Translations.getText(context, 'departure')} \u2192 ${booking.rideDestination.isEmpty ? 'EST' : booking.rideDestination}";
             if (route.length > 30) route = "${route.substring(0, 30)}...";
 
             return Card(
@@ -207,7 +213,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                                 MaterialPageRoute(
                                   builder: (_) => ChatScreen(
                                     bookingId: booking.id,
-                                    otherUserName: booking.driverName ?? 'Conducteur',
+                                    otherUserName: booking.driverName ?? Translations.getText(context, 'driver'),
                                     otherUserId: booking.driverId,
                                     otherUserPhotoUrl: booking.driverPhotoUrl,
                                   ),
@@ -252,17 +258,23 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(isAccepted ? "Supprimer" : "Annuler"),
+        title: Text(isAccepted ? Translations.getText(context, 'delete') : Translations.getText(context, 'cancel')),
         content: Text(isAccepted
-            ? "Voulez-vous vraiment annuler cette reservation ?\nLe conducteur sera notifie."
-            : "Voulez-vous annuler cette demande ?"),
+            ? Translations.getText(context, 'cancel_booking_confirm')
+            : Translations.getText(context, 'cancel_request_confirm')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Retour")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(Translations.getText(context, 'back_btn')),
+          ),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx, true);
             },
-            child: Text("Confirmer", style: TextStyle(color: scheme.error, fontWeight: FontWeight.bold)),
+            child: Text(
+              Translations.getText(context, 'confirm'),
+              style: TextStyle(color: scheme.error, fontWeight: FontWeight.bold),
+            ),
           )
         ],
       ),
@@ -277,7 +289,9 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
 
       final String rideId = booking.rideId;
       final String driverId = booking.driverId;
-      final String passengerName = booking.passengerName.isEmpty ? 'Un passager' : booking.passengerName;
+      final String passengerName = booking.passengerName.isEmpty
+          ? Translations.getText(context, 'passenger')
+          : booking.passengerName;
       final String status = booking.status.isEmpty ? 'pending' : booking.status;
       final bool wasAccepted = status == 'accepted';
 
@@ -290,8 +304,8 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
         // Notify Driver
         NotificationService.sendNotification(
           receiverId: driverId,
-          title: "Annulation Reservation",
-          body: "$passengerName a annule sa reservation.",
+          title: Translations.getText(context, 'booking_cancel_title'),
+          body: "$passengerName ${Translations.getText(context, 'booking_cancel_body')}",
           type: "booking_cancel",
         );
       } else {
@@ -299,13 +313,20 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Reservation annulee/supprimee.")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(Translations.getText(context, 'booking_deleted'))),
+        );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${Translations.getText(context, 'error_prefix')} $e")),
+        );
+      }
     }
   }
 }
+
 
 
 

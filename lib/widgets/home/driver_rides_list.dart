@@ -25,7 +25,9 @@ class _DriverRidesListState extends State<DriverRidesList> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const Center(child: Text("Non connecté"));
+    if (user == null) {
+      return Center(child: Text(Translations.getText(context, 'not_connected')));
+    }
 
     return StreamBuilder<List<Ride>>(
       stream: RideRepository().streamDriverRides(user.uid),
@@ -77,7 +79,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
                       textColor: scheme.primary,
                     ),
                     trailing: Text(
-                      "$seats P. Disp.",
+                      "$seats ${Translations.getText(context, 'seats_available')}",
                       style: TextStyle(fontWeight: FontWeight.bold, color: seats > 0 ? scheme.secondary : scheme.error),
                     ),
                   ),
@@ -172,13 +174,13 @@ class _DriverRidesListState extends State<DriverRidesList> {
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text("Supprimer"),
-        content: const Text("Voulez-vous supprimer ce trajet ?\nCela annulera toutes les réservations associées."),
+        title: Text(Translations.getText(context, 'delete')),
+        content: Text(Translations.getText(context, 'delete_ride_confirm')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler")),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(Translations.getText(context, 'cancel'))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text("Supprimer", style: TextStyle(color: scheme.error)),
+            child: Text(Translations.getText(context, 'delete'), style: TextStyle(color: scheme.error)),
           )
         ],
       ),
@@ -197,8 +199,8 @@ class _DriverRidesListState extends State<DriverRidesList> {
         if (booking.status == 'pending' || booking.status == 'accepted') {
           NotificationService.sendNotification(
             receiverId: booking.passengerId,
-            title: "Trajet Annulé",
-            body: "Le conducteur a annulé le trajet ${booking.departureAddress ?? ''}.",
+            title: Translations.getText(context, 'ride_canceled_title'),
+            body: "${Translations.getText(context, 'ride_canceled_body')} ${booking.departureAddress ?? ''}".trim(),
             type: "ride_cancel",
           );
         }
@@ -207,10 +209,14 @@ class _DriverRidesListState extends State<DriverRidesList> {
       await rideRepo.deleteRideAndBookings(rideId);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trajet supprimé.")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Translations.getText(context, 'ride_deleted'))));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${Translations.getText(context, 'error_prefix')} $e")),
+        );
+      }
     }
   }
 
@@ -227,7 +233,10 @@ class _DriverRidesListState extends State<DriverRidesList> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Demandes de réservation", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                Translations.getText(context, 'booking_requests'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const Divider(),
               Expanded(
                 child: StreamBuilder<List<Booking>>(
@@ -237,7 +246,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
                       return const Center(child: CircularProgressIndicator());
                     }
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return const Center(child: Text("Aucune demande."));
+                      return Center(child: Text(Translations.getText(context, 'no_requests')));
                     }
 
                     // Client-side Sort: Pending first, then Accepted, then Rejected
@@ -285,7 +294,11 @@ class _DriverRidesListState extends State<DriverRidesList> {
                                       Text(passengerName,
                                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                       Text(
-                                        status == 'pending' ? 'En attente' : status == 'accepted' ? 'Accepté' : 'Refusé',
+                                        status == 'pending'
+                                            ? Translations.getText(context, 'pending')
+                                            : status == 'accepted'
+                                                ? Translations.getText(context, 'accepted')
+                                                : Translations.getText(context, 'rejected'),
                                         style: TextStyle(
                                           color: status == 'pending'
                                               ? scheme.tertiary
@@ -303,17 +316,17 @@ class _DriverRidesListState extends State<DriverRidesList> {
                                   IconButton(
                                     icon: Icon(Icons.check_circle, color: scheme.secondary, size: 30),
                                     onPressed: () => _handleBooking(req.id, rideId, true, req.passengerId),
-                                    tooltip: "Accepter",
+                                    tooltip: Translations.getText(context, 'accept'),
                                   ),
                                   IconButton(
                                     icon: Icon(Icons.cancel, color: scheme.error, size: 30),
                                     onPressed: () => _handleBooking(req.id, rideId, false, req.passengerId),
-                                    tooltip: "Refuser",
+                                    tooltip: Translations.getText(context, 'reject'),
                                   ),
                                 ] else if (status == 'accepted') ...[
                                   IconButton(
                                     icon: Icon(Icons.chat_bubble, color: scheme.primary),
-                                    tooltip: "Discuter",
+                                    tooltip: Translations.getText(context, 'discuss'),
                                     onPressed: () {
                                       Navigator.push(
                                         context,
@@ -359,27 +372,27 @@ class _DriverRidesListState extends State<DriverRidesList> {
         // Notify Passenger
         NotificationService.sendNotification(
           receiverId: passengerId,
-          title: "Reservation acceptee !",
-          body: "Le conducteur a accepte votre demande.",
+          title: Translations.getText(context, 'booking_accepted_title'),
+          body: Translations.getText(context, 'booking_accepted_body'),
           type: "booking_status",
         );
 
         if (mounted) Navigator.pop(context); // Close modal to refresh seats
       } catch (e) {
-        String message = "Erreur: $e";
+        String message = "${Translations.getText(context, 'error_prefix')} $e";
         if (e is StateError) {
           switch (e.message) {
             case 'no-seats':
-              message = "Plus de places disponibles !";
+              message = Translations.getText(context, 'error_no_seats');
               break;
             case 'booking-not-pending':
-              message = "Demande deja traitee.";
+              message = Translations.getText(context, 'error_request_processed');
               break;
             case 'ride-missing':
-              message = "Trajet introuvable.";
+              message = Translations.getText(context, 'error_ride_not_found');
               break;
             default:
-              message = "Erreur traitement.";
+              message = Translations.getText(context, 'error_processing');
           }
         }
         if (mounted) {
@@ -395,7 +408,9 @@ class _DriverRidesListState extends State<DriverRidesList> {
         final status = booking.status.isEmpty ? 'pending' : booking.status;
         if (status != 'pending') {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Demande deja traitee.")));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(Translations.getText(context, 'error_request_processed'))),
+            );
           }
           return;
         }
@@ -405,15 +420,21 @@ class _DriverRidesListState extends State<DriverRidesList> {
         // Notify Passenger
         NotificationService.sendNotification(
           receiverId: passengerId,
-          title: "Reservation refusee",
-          body: "Le conducteur a refuse votre demande.",
+          title: Translations.getText(context, 'booking_rejected_title'),
+          body: Translations.getText(context, 'booking_rejected_body'),
           type: "booking_status",
         );
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("${Translations.getText(context, 'error_prefix')} $e")),
+          );
+        }
       }
     }
   }
 }
+
+
 
 

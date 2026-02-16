@@ -32,6 +32,20 @@ class _FindRideScreenState extends State<FindRideScreen> {
     );
   }
 
+  String _bookingMessage(BookingCreateResult result) {
+    switch (result.status) {
+      case BookingCreateStatus.success:
+        return Translations.getText(context, 'booking_request_sent');
+      case BookingCreateStatus.alreadyExists:
+        return Translations.getText(context, 'booking_already_exists');
+      case BookingCreateStatus.invalidData:
+        return Translations.getText(context, 'booking_invalid_data');
+      case BookingCreateStatus.error:
+      default:
+        return Translations.getText(context, 'booking_error_generic');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final LatLng? pickup = widget.userPickupLocation;
@@ -91,7 +105,9 @@ class _FindRideScreenState extends State<FindRideScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Erreur: ${snapshot.error}'));
+            return Center(
+              child: Text("${Translations.getText(context, 'error_prefix')} ${snapshot.error}"),
+            );
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return Center(
@@ -145,16 +161,16 @@ class _FindRideScreenState extends State<FindRideScreen> {
                   children: [
                     Icon(Icons.commute_outlined, size: 80, color: Colors.grey[300]),
                     const SizedBox(height: 20),
-                    const Text(
-                      'Aucun trajet ne passe par votre position.',
+                    Text(
+                      Translations.getText(context, 'no_trips_nearby'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      'Essayez de vous rapprocher d\'une route principale.',
+                    Text(
+                      Translations.getText(context, 'try_move_closer'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
+                      style: const TextStyle(color: Colors.grey),
                     ),
                   ],
                 ),
@@ -171,11 +187,11 @@ class _FindRideScreenState extends State<FindRideScreen> {
                   final ride = filteredRides[index];
                   final rideData = ride.toMap();
 
-                  String formattedDate = "Date inconnue";
+                  String formattedDate = Translations.getText(context, 'date_unknown');
                   try {
                     formattedDate = DateFormat('dd/MM/yyyy HH:mm').format(ride.date);
                   } catch (e) {
-                    formattedDate = "Erreur date";
+                    formattedDate = Translations.getText(context, 'date_error');
                   }
 
                   String driverName = ride.driverName;
@@ -192,6 +208,9 @@ class _FindRideScreenState extends State<FindRideScreen> {
 
                   final bool isMyRide = currentUserUid == ride.driverId;
                   final String vehicleType = ride.vehicleType;
+                  final String vehicleLabel = vehicleType == 'Moto'
+                      ? Translations.getText(context, 'vehicle_moto')
+                      : Translations.getText(context, 'vehicle_car');
                   final int availableSeats = ride.seats;
 
                   return Card(
@@ -234,7 +253,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                                 color: Colors.grey[600],
                                               ),
                                               const SizedBox(width: 4),
-                                              Text(vehicleType, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                              Text(vehicleLabel, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                                             ],
                                           ),
                                         ],
@@ -265,7 +284,10 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('Départ', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                                        Text(
+                                          Translations.getText(context, 'departure'),
+                                          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                                        ),
                                         Text(departureCity, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
                                       ],
                                     ),
@@ -278,7 +300,10 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
-                                        Text('Arrivée', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                                        Text(
+                                          Translations.getText(context, 'arrival'),
+                                          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                                        ),
                                         Text(destinationName, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
                                       ],
                                     ),
@@ -304,7 +329,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                       Icon(Icons.event_seat, size: 16, color: Colors.grey[600]),
                                       const SizedBox(width: 5),
                                       Text(
-                                        '$seats place(s)',
+                                        '$seats ${Translations.getText(context, 'seats')}',
                                         style: TextStyle(
                                           color: availableSeats > 0 ? Colors.grey[800] : Colors.red,
                                           fontWeight: availableSeats > 0 ? FontWeight.normal : FontWeight.bold
@@ -338,7 +363,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                         );
                                       },
                                       icon: const Icon(Icons.map, size: 18),
-                                      label: const Text("Voir Carte"),
+                                      label: Text(Translations.getText(context, 'map_view')),
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: scheme.primary,
                                         side: BorderSide(color: scheme.primary),
@@ -353,7 +378,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                           ? () => _reserveRide(context, ride.id, rideData) 
                                           : null,
                                         icon: const Icon(Icons.bookmark_add, size: 18),
-                                        label: const Text("Réserver"),
+                                        label: Text(Translations.getText(context, 'book')),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: scheme.primary,
                                           foregroundColor: Colors.white,
@@ -384,9 +409,9 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                       border: Border.all(color: Colors.red, width: 4),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child: const Text(
-                                      "COMPLET",
-                                      style: TextStyle(
+                                    child: Text(
+                                      Translations.getText(context, 'full'),
+                                      style: const TextStyle(
                                         color: Colors.red,
                                         fontSize: 28,
                                         fontWeight: FontWeight.w900,
@@ -411,7 +436,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
   Future<void> _reserveRide(BuildContext context, String rideId, Map<String, dynamic> rideData) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnackBar(context, "Vous devez être connecté.", Colors.red);
+      _showSnackBar(context, Translations.getText(context, 'error_not_connected'), Colors.red);
       return;
     }
 
@@ -419,13 +444,16 @@ class _FindRideScreenState extends State<FindRideScreen> {
     bool? confirm = await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Confirmer la réservation"),
-        content: const Text("Voulez-vous envoyer une demande de réservation au conducteur ?"),
+        title: Text(Translations.getText(context, 'confirm_booking_title')),
+        content: Text(Translations.getText(context, 'confirm_booking_message')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(Translations.getText(context, 'cancel')),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("Confirmer"),
+            child: Text(Translations.getText(context, 'confirm')),
           ),
         ],
       ),
@@ -446,6 +474,6 @@ class _FindRideScreenState extends State<FindRideScreen> {
       BookingCreateStatus.alreadyExists => scheme.tertiary,
       _ => scheme.error,
     };
-    _showSnackBar(context, result.message, color);
+    _showSnackBar(context, _bookingMessage(result), color);
   }
 }
