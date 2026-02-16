@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../repositories/user_repository.dart';
 import '../services/profile_service.dart';
+import '../models/user_profile.dart';
 
 
 class ProfileScreen extends StatefulWidget {
@@ -123,7 +124,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showChangePasswordDialog() {
     final TextEditingController passwordController = TextEditingController();
-    bool _obscurePassword = true;
+    bool obscurePassword = true;
 
     showDialog(
       context: context,
@@ -138,13 +139,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   TextField(
                     controller: passwordController,
-                    obscureText: _obscurePassword,
+                    obscureText: obscurePassword,
                     decoration: InputDecoration(
                       labelText: Translations.getText(context, 'password_field'),
                       hintText: Translations.getText(context, 'password_min_hint'),
                       suffixIcon: IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () => setState(() => obscurePassword = !obscurePassword),
                       ),
                     ),
                   ),
@@ -255,6 +256,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            if (FirebaseAuth.instance.currentUser != null)
+              StreamBuilder<UserProfile?>(
+                stream: UserRepository().streamProfile(FirebaseAuth.instance.currentUser!.uid),
+                builder: (context, snapshot) {
+                  final profile = snapshot.data;
+                  final avg = profile?.ratingAvg ?? 0.0;
+                  final count = profile?.ratingCount ?? 0;
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.star_rounded, color: scheme.tertiary),
+                      const SizedBox(width: 6),
+                      Text(
+                        count > 0
+                            ? '${avg.toStringAsFixed(1)} ($count)'
+                            : Translations.getText(context, 'no_reviews'),
+                        style: textTheme.titleSmall,
+                      ),
+                    ],
+                  );
+                },
+              ),
             const SizedBox(height: 30),
 
             // Name Field

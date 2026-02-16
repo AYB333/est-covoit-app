@@ -13,6 +13,13 @@ class UserRepository {
     return UserProfile.fromDoc(doc);
   }
 
+  Stream<UserProfile?> streamProfile(String uid) {
+    return _db.collection('users').doc(uid).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return UserProfile.fromDoc(doc);
+    });
+  }
+
   Future<void> setPhoneNumber(String uid, String phoneNumber) async {
     await _db.collection('users').doc(uid).set({
       'phoneNumber': phoneNumber,

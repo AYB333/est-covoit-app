@@ -5,6 +5,10 @@ import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/booking_service.dart';
 import '../config/translations.dart';
+import '../models/user_profile.dart';
+import '../repositories/safety_repository.dart';
+import '../repositories/user_repository.dart';
+import 'public_profile_screen.dart';
 
 class RideMapViewer extends StatefulWidget {
   final List<LatLng> polylinePoints;
@@ -50,9 +54,38 @@ class _RideMapViewerState extends State<RideMapViewer> {
       case BookingCreateStatus.invalidData:
         return Translations.getText(context, 'booking_invalid_data');
       case BookingCreateStatus.error:
-      default:
         return Translations.getText(context, 'booking_error_generic');
     }
+  }
+
+  Widget _buildDriverRating(String driverId) {
+    final scheme = Theme.of(context).colorScheme;
+    return StreamBuilder<UserProfile?>(
+      stream: UserRepository().streamProfile(driverId),
+      builder: (context, snapshot) {
+        final profile = snapshot.data;
+        final avg = profile?.ratingAvg ?? 0;
+        final count = profile?.ratingCount ?? 0;
+        if (count <= 0) {
+          return Text(
+            Translations.getText(context, 'no_reviews'),
+            style: TextStyle(color: scheme.onSurfaceVariant),
+          );
+        }
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.star_rounded, size: 18, color: scheme.tertiary),
+            const SizedBox(width: 4),
+            Text(
+              '${avg.toStringAsFixed(1)} ($count)',
+              style: TextStyle(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w600),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _reserveRide() async {
@@ -65,6 +98,18 @@ class _RideMapViewerState extends State<RideMapViewer> {
     if (user == null) {
       _showSnackBar(Translations.getText(context, 'error_not_connected'), Colors.red);
       return;
+    }
+
+    final driverId = widget.rideData!['driverId']?.toString();
+    if (driverId != null && driverId.isNotEmpty) {
+      final blocked = await SafetyRepository().isBlocked(
+        blockerId: user.uid,
+        blockedUserId: driverId,
+      );
+      if (blocked) {
+        _showSnackBar(Translations.getText(context, 'blocked_action_unavailable'), Colors.red);
+        return;
+      }
     }
 
     // Confirmation Dialog
@@ -107,7 +152,6 @@ class _RideMapViewerState extends State<RideMapViewer> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     LatLng? startPoint;
     if (widget.polylinePoints.isNotEmpty) {
       startPoint = widget.polylinePoints.first;
@@ -123,8 +167,20 @@ class _RideMapViewerState extends State<RideMapViewer> {
     return Scaffold(
       appBar: AppBar(
         title: Text("${Translations.getText(context, 'ride_of')} ${widget.driverName}"),
-        backgroundColor: scheme.surface,
-        foregroundColor: scheme.onSurface,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [scheme.primary, scheme.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       body: Stack(
         children: [
@@ -171,57 +227,130 @@ class _RideMapViewerState extends State<RideMapViewer> {
             bottom: 20,
             left: 20,
             right: 20,
-            child: Card(
-              elevation: 8,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              child: Padding(
-                padding: const EdgeInsets.all(15.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "${Translations.getText(context, 'driver')}: ${widget.driverName}",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: scheme.primary),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: scheme.outline.withValues(alpha: 0.2)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "${Translations.getText(context, 'driver')}: ${widget.driverName}",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: scheme.primary,
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "${Translations.getText(context, 'price')}: ${widget.price} MAD",
-                          style: const TextStyle(fontSize: 16, color: Colors.black87),
-                        ),
-                        Text(
-                          "${Translations.getText(context, 'date')}: ${DateFormat('dd/MM HH:mm').format(widget.date)}",
-                          style: const TextStyle(fontSize: 16, color: Colors.black87),
-                        ),
-                      ],
-                    ),
-                    
-                    if (!isMyRide && widget.rideData != null) ...[
-                      const SizedBox(height: 15),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: seats > 0 ? _reserveRide : null,
-                          icon: const Icon(Icons.bookmark_added, color: Colors.white),
-                          label: Text(
-                            seats > 0
-                                ? Translations.getText(context, 'book_this_trip')
-                                : Translations.getText(context, 'full'),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: seats > 0 ? scheme.primary : scheme.surfaceVariant,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  const SizedBox(height: 4),
+                  if (widget.rideData != null && widget.rideData!['driverId'] != null)
+                    _buildDriverRating(widget.rideData!['driverId'].toString()),
+                  if (widget.rideData != null && widget.rideData!['driverId'] != null) ...[
+                    const SizedBox(height: 10),
+                    Center(
+                      child: SizedBox(
+                        width: 210,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PublicProfileScreen(
+                                  userId: widget.rideData!['driverId'].toString(),
+                                  userName: widget.driverName,
+                                  photoUrl: widget.rideData!['driverPhotoUrl']?.toString(),
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.person_outline, size: 18),
+                          label: Text(Translations.getText(context, 'view_profile')),
+                          style: OutlinedButton.styleFrom(
+                            alignment: Alignment.center,
+                            foregroundColor: scheme.primary,
+                            textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                            side: BorderSide(color: scheme.primary.withValues(alpha: 0.55)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
-                    ]
+                    ),
                   ],
-                ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.payments_outlined, size: 16, color: scheme.secondary),
+                          const SizedBox(width: 4),
+                          Text(
+                            "${Translations.getText(context, 'price')}: ${widget.price} MAD",
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: scheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_outlined, size: 15, color: scheme.onSurfaceVariant),
+                          const SizedBox(width: 4),
+                          Text(
+                            DateFormat('dd/MM HH:mm').format(widget.date),
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: scheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  if (!isMyRide && widget.rideData != null) ...[
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: seats > 0 ? _reserveRide : null,
+                        icon: const Icon(Icons.bookmark_added, color: Colors.white),
+                        label: Text(
+                          seats > 0
+                              ? Translations.getText(context, 'book_this_trip')
+                              : Translations.getText(context, 'full'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: seats > 0 ? scheme.primary : scheme.surfaceVariant,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ]
+                ],
               ),
             ),
           ),

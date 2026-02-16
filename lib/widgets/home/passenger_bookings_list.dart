@@ -4,11 +4,14 @@ import 'package:intl/intl.dart';
 
 import '../../config/translations.dart';
 import '../../screens/chat_screen.dart';
+import '../../screens/public_profile_screen.dart';
+import '../../screens/review_screen.dart';
 import '../../services/notification_service.dart';
 import '../user_avatar.dart';
 import '../../models/booking.dart';
 import '../../models/ride.dart';
 import '../../repositories/booking_repository.dart';
+import '../../repositories/review_repository.dart';
 import '../../repositories/ride_repository.dart';
 
 class PassengerBookingsList extends StatefulWidget {
@@ -19,6 +22,40 @@ class PassengerBookingsList extends StatefulWidget {
 }
 
 class _PassengerBookingsListState extends State<PassengerBookingsList> {
+  final Set<String> _ratedBookingIds = <String>{};
+  DateTime? _filterDate;
+  double? _filterMaxPrice;
+  String _filterStatus = 'all';
+
+  bool get _hasFilters =>
+      _filterDate != null || _filterMaxPrice != null || _filterStatus != 'all';
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  Future<void> _openFilters() async {
+    final result = await showModalBottomSheet<_PassengerFiltersResult>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return _PassengerFiltersSheet(
+          initialDate: _filterDate,
+          initialMaxPrice: _filterMaxPrice,
+          initialStatus: _filterStatus,
+        );
+      },
+    );
+    if (!mounted || result == null) return;
+    setState(() {
+      _filterDate = result.date;
+      _filterMaxPrice = result.maxPrice;
+      _filterStatus = result.status;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -68,33 +105,140 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
           return tB.compareTo(tA); // Descending
         });
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: bookings.length,
-          itemBuilder: (context, index) {
-            final booking = bookings[index];
+        final filteredBookings = bookings.where((booking) {
+          final String status = booking.status.isEmpty ? 'pending' : booking.status;
+          if (_filterStatus != 'all' && status != _filterStatus) {
+            return false;
+          }
+          if (_filterDate != null) {
+            if (booking.rideDate == null || !_isSameDay(booking.rideDate!, _filterDate!)) {
+              return false;
+            }
+          }
+          if (_filterMaxPrice != null) {
+            final price = booking.ridePrice ?? 0;
+            if (price > _filterMaxPrice!) {
+              return false;
+            }
+          }
+          return true;
+        }).toList();
+
+        if (filteredBookings.isEmpty) {
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Row(
+                  children: [
+                    Text(
+                      Translations.getText(context, 'filters'),
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (_hasFilters)
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _filterDate = null;
+                            _filterMaxPrice = null;
+                            _filterStatus = 'all';
+                          });
+                        },
+                        child: Text(
+                          Translations.getText(context, 'clear_filters'),
+                          style: TextStyle(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: _openFilters,
+                      icon: const Icon(Icons.tune_rounded),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Center(
+                  child: Text(
+                    Translations.getText(context, 'filtered_empty'),
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                children: [
+                  Text(
+                    Translations.getText(context, 'filters'),
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_hasFilters)
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _filterDate = null;
+                          _filterMaxPrice = null;
+                          _filterStatus = 'all';
+                        });
+                      },
+                      child: Text(
+                        Translations.getText(context, 'clear_filters'),
+                        style: TextStyle(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: _openFilters,
+                    icon: const Icon(Icons.tune_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: filteredBookings.length,
+                itemBuilder: (context, index) {
+                  final booking = filteredBookings[index];
             final String status = booking.status.isEmpty ? 'pending' : booking.status;
 
             Color statusColor;
             String statusText;
-            IconData statusIcon;
 
             switch (status) {
               case 'accepted':
                 statusColor = scheme.secondary;
                 statusText = Translations.getText(context, 'accepted');
-                statusIcon = Icons.check_circle;
                 break;
               case 'rejected':
                 statusColor = scheme.error;
                 statusText = Translations.getText(context, 'rejected');
-                statusIcon = Icons.cancel;
                 break;
               case 'pending':
               default:
                 statusColor = scheme.tertiary;
                 statusText = Translations.getText(context, 'pending');
-                statusIcon = Icons.hourglass_empty;
                 break;
             }
 
@@ -110,7 +254,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
             String route = "${booking.departureAddress ?? Translations.getText(context, 'departure')} \u2192 ${booking.rideDestination.isEmpty ? 'EST' : booking.rideDestination}";
             if (route.length > 30) route = "${route.substring(0, 30)}...";
 
-            return Card(
+                  return Card(
               elevation: 4,
               margin: const EdgeInsets.only(bottom: 15),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -126,12 +270,19 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                       children: [
                         // Dynamic Driver Avatar with Fallback
                         booking.driverPhotoUrl != null && booking.driverPhotoUrl!.isNotEmpty
-                            ? UserAvatar(
-                                userName: booking.driverName ?? '?',
-                                imageUrl: booking.driverPhotoUrl,
-                                radius: 22,
-                                backgroundColor: Theme.of(context).cardColor,
-                                textColor: scheme.primary,
+                            ? GestureDetector(
+                                onTap: () => _openPublicProfile(
+                                  userId: booking.driverId,
+                                  userName: booking.driverName ?? '?',
+                                  photoUrl: booking.driverPhotoUrl,
+                                ),
+                                child: UserAvatar(
+                                  userName: booking.driverName ?? '?',
+                                  imageUrl: booking.driverPhotoUrl,
+                                  radius: 22,
+                                  backgroundColor: Theme.of(context).cardColor,
+                                  textColor: scheme.primary,
+                                ),
                               )
                             : FutureBuilder<Ride?>(
                                 future: RideRepository().fetchRide(booking.rideId),
@@ -140,12 +291,19 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                                   if (rideSnap.hasData && rideSnap.data != null) {
                                     fallbackUrl = rideSnap.data!.driverPhotoUrl;
                                   }
-                                  return UserAvatar(
-                                    userName: booking.driverName ?? '?',
-                                    imageUrl: fallbackUrl,
-                                    radius: 22,
-                                    backgroundColor: Theme.of(context).cardColor,
-                                    textColor: scheme.primary,
+                                  return GestureDetector(
+                                    onTap: () => _openPublicProfile(
+                                      userId: booking.driverId,
+                                      userName: booking.driverName ?? '?',
+                                      photoUrl: fallbackUrl,
+                                    ),
+                                    child: UserAvatar(
+                                      userName: booking.driverName ?? '?',
+                                      imageUrl: fallbackUrl,
+                                      radius: 22,
+                                      backgroundColor: Theme.of(context).cardColor,
+                                      textColor: scheme.primary,
+                                    ),
                                   );
                                 },
                               ),
@@ -202,8 +360,10 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                   // Actions Section
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
                       children: [
                         if (status == 'accepted')
                           TextButton.icon(
@@ -226,8 +386,33 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                               style: TextStyle(color: scheme.primary, fontWeight: FontWeight.bold),
                             ),
                           ),
-
-                        // Delete/Cancel Button for all statuses
+                        if (status == 'accepted')
+                          FutureBuilder<bool>(
+                            future: ReviewRepository()
+                                .fetchReviewForBooking(
+                                  bookingId: booking.id,
+                                  reviewerId: user.uid,
+                                )
+                                .then((review) => review != null),
+                            builder: (context, snap) {
+                              final bool rated =
+                                  _ratedBookingIds.contains(booking.id) || (snap.data ?? false);
+                              return TextButton.icon(
+                                onPressed: rated ? null : () => _showReviewDialog(booking),
+                                icon: Icon(
+                                  rated ? Icons.star : Icons.star_border_rounded,
+                                  size: 20,
+                                  color: rated ? scheme.tertiary : scheme.primary,
+                                ),
+                                label: Text(
+                                  rated
+                                      ? Translations.getText(context, 'rated')
+                                      : Translations.getText(context, 'rate'),
+                                  style: TextStyle(color: rated ? scheme.tertiary : scheme.primary),
+                                ),
+                              );
+                            },
+                          ),
                         TextButton.icon(
                           onPressed: () => _deleteBooking(booking.id, status == 'accepted'),
                           icon: Icon(
@@ -236,7 +421,9 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                             color: scheme.error,
                           ),
                           label: Text(
-                            status == 'pending' ? Translations.getText(context, 'cancel') : Translations.getText(context, 'delete'),
+                            status == 'pending'
+                                ? Translations.getText(context, 'cancel')
+                                : Translations.getText(context, 'delete'),
                             style: TextStyle(color: scheme.error),
                           ),
                         ),
@@ -245,10 +432,66 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                   )
                 ],
               ),
-            );
-          },
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  void _openPublicProfile({
+    required String userId,
+    required String userName,
+    String? photoUrl,
+  }) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PublicProfileScreen(
+          userId: userId,
+          userName: userName,
+          photoUrl: photoUrl,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showReviewDialog(Booking booking) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || !mounted) return;
+
+    final String? result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReviewScreen(
+          booking: booking,
+          reviewerId: user.uid,
+        ),
+      ),
+    );
+
+    if (!mounted || result == null) return;
+
+    if (result == 'submitted' || result == 'exists') {
+      setState(() {
+        _ratedBookingIds.add(booking.id);
+      });
+    }
+
+    String message;
+    if (result == 'submitted') {
+      message = Translations.getText(context, 'review_submitted');
+    } else if (result == 'exists') {
+      message = Translations.getText(context, 'review_exists');
+    } else {
+      message = Translations.getText(context, 'review_error');
+    }
+
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -327,6 +570,189 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
   }
 }
 
+
+class _PassengerFiltersResult {
+  final DateTime? date;
+  final double? maxPrice;
+  final String status;
+
+  const _PassengerFiltersResult({
+    required this.date,
+    required this.maxPrice,
+    required this.status,
+  });
+}
+
+class _PassengerFiltersSheet extends StatefulWidget {
+  final DateTime? initialDate;
+  final double? initialMaxPrice;
+  final String initialStatus;
+
+  const _PassengerFiltersSheet({
+    required this.initialDate,
+    required this.initialMaxPrice,
+    required this.initialStatus,
+  });
+
+  @override
+  State<_PassengerFiltersSheet> createState() => _PassengerFiltersSheetState();
+}
+
+class _PassengerFiltersSheetState extends State<_PassengerFiltersSheet> {
+  late final TextEditingController _maxPriceController;
+  DateTime? _selectedDate;
+  late String _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.initialDate;
+    _status = widget.initialStatus;
+    _maxPriceController = TextEditingController(
+      text: widget.initialMaxPrice?.toStringAsFixed(1) ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _maxPriceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  void _apply() {
+    final raw = _maxPriceController.text.trim().replaceAll(',', '.');
+    double? parsed;
+    if (raw.isNotEmpty) {
+      parsed = double.tryParse(raw);
+      if (parsed == null || parsed < 0) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(Translations.getText(context, 'filter_invalid_price'))),
+        );
+        return;
+      }
+    }
+
+    Navigator.pop(
+      context,
+      _PassengerFiltersResult(
+        date: _selectedDate,
+        maxPrice: parsed,
+        status: _status,
+      ),
+    );
+  }
+
+  void _clear() {
+    Navigator.pop(
+      context,
+      const _PassengerFiltersResult(
+        date: null,
+        maxPrice: null,
+        status: 'all',
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            Translations.getText(context, 'filters'),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(Translations.getText(context, 'date')),
+            subtitle: Text(
+              _selectedDate == null
+                  ? Translations.getText(context, 'filter_all_dates')
+                  : DateFormat('dd/MM/yyyy').format(_selectedDate!),
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.calendar_today_outlined),
+              onPressed: _pickDate,
+            ),
+          ),
+          TextField(
+            controller: _maxPriceController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: "${Translations.getText(context, 'price')} (MAD)",
+              hintText: Translations.getText(context, 'filter_any_price'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            initialValue: _status,
+            decoration: InputDecoration(
+              labelText: Translations.getText(context, 'status_label'),
+            ),
+            items: [
+              DropdownMenuItem<String>(
+                value: 'all',
+                child: Text(Translations.getText(context, 'filter_all_status')),
+              ),
+              DropdownMenuItem<String>(
+                value: 'pending',
+                child: Text(Translations.getText(context, 'pending')),
+              ),
+              DropdownMenuItem<String>(
+                value: 'accepted',
+                child: Text(Translations.getText(context, 'accepted')),
+              ),
+              DropdownMenuItem<String>(
+                value: 'rejected',
+                child: Text(Translations.getText(context, 'rejected')),
+              ),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _status = value);
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              TextButton(
+                onPressed: _clear,
+                child: Text(Translations.getText(context, 'clear_filters')),
+              ),
+              const Spacer(),
+              ElevatedButton(
+                onPressed: _apply,
+                child: Text(Translations.getText(context, 'filter_apply')),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 
 

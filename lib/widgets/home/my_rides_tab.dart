@@ -5,13 +5,18 @@ import 'driver_rides_list.dart';
 import 'passenger_bookings_list.dart';
 
 class MyRidesTab extends StatelessWidget {
-  const MyRidesTab({super.key});
+  final int initialTabIndex;
+
+  const MyRidesTab({super.key, this.initialTabIndex = 0});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final int safeInitialIndex =
+        initialTabIndex < 0 ? 0 : (initialTabIndex > 1 ? 1 : initialTabIndex);
     return DefaultTabController(
       length: 2,
+      initialIndex: safeInitialIndex,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(

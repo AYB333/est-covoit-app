@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
@@ -5,9 +7,13 @@ import 'package:est_covoit/screens/ride_map_viewer.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/user_avatar.dart';
 import '../config/translations.dart';
+import 'public_profile_screen.dart';
 import '../services/booking_service.dart';
 import '../models/ride.dart';
+import '../models/user_profile.dart';
 import '../repositories/ride_repository.dart';
+import '../repositories/safety_repository.dart';
+import '../repositories/user_repository.dart';
 
 
 class FindRideScreen extends StatefulWidget {
@@ -20,6 +26,13 @@ class FindRideScreen extends StatefulWidget {
 }
 
 class _FindRideScreenState extends State<FindRideScreen> {
+  DateTime? _filterDate;
+  double? _filterMaxPrice;
+  int _filterMinSeats = 0;
+
+  bool get _hasFilters =>
+      _filterDate != null || _filterMaxPrice != null || _filterMinSeats > 0;
+
   void _showSnackBar(BuildContext context, String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -41,15 +54,113 @@ class _FindRideScreenState extends State<FindRideScreen> {
       case BookingCreateStatus.invalidData:
         return Translations.getText(context, 'booking_invalid_data');
       case BookingCreateStatus.error:
-      default:
         return Translations.getText(context, 'booking_error_generic');
     }
+  }
+
+  Widget _buildDriverRating(String driverId) {
+    final scheme = Theme.of(context).colorScheme;
+    return StreamBuilder<UserProfile?>(
+      stream: UserRepository().streamProfile(driverId),
+      builder: (context, snapshot) {
+        final profile = snapshot.data;
+        final double avg = profile?.ratingAvg ?? 0;
+        final int count = profile?.ratingCount ?? 0;
+        if (count <= 0) {
+          return Text(
+            Translations.getText(context, 'no_reviews'),
+            style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+          );
+        }
+
+        return Row(
+          children: [
+            Icon(Icons.star_rounded, size: 14, color: scheme.tertiary),
+            const SizedBox(width: 3),
+            Text(
+              '${avg.toStringAsFixed(1)} ($count)',
+              style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant, fontWeight: FontWeight.w600),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  double _distanceToRideMeters({
+    required Ride ride,
+    required LatLng pickup,
+    required Distance calculator,
+  }) {
+    if (ride.polylinePoints.isNotEmpty) {
+      double minDist = double.infinity;
+      for (final point in ride.polylinePoints) {
+        final dist = calculator.as(LengthUnit.Meter, pickup, point);
+        if (dist < minDist) minDist = dist;
+      }
+      return minDist;
+    }
+
+    if (ride.startLat != 0 || ride.startLng != 0) {
+      return calculator.as(
+        LengthUnit.Meter,
+        pickup,
+        LatLng(ride.startLat, ride.startLng),
+      );
+    }
+
+    return 100000;
+  }
+
+  double _smartScore({
+    required Ride ride,
+    required double distanceMeters,
+    required double maxPrice,
+    required DateTime now,
+  }) {
+    final distanceScore = (1 - (distanceMeters / 1500)).clamp(0.0, 1.0);
+    final priceScore = (1 - (ride.price / maxPrice)).clamp(0.0, 1.0);
+    final seatScore = (ride.seats / 4).clamp(0.0, 1.0);
+    final hoursAhead = ride.date.difference(now).inMinutes / 60.0;
+    final timeScore = (1 - (hoursAhead / 24)).clamp(0.0, 1.0);
+
+    return (distanceScore * 0.45) +
+        (priceScore * 0.25) +
+        (timeScore * 0.20) +
+        (seatScore * 0.10);
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  Future<void> _openFilters() async {
+    final result = await showModalBottomSheet<_FindRideFilterResult>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return _FindRideFiltersSheet(
+          initialDate: _filterDate,
+          initialMaxPrice: _filterMaxPrice,
+          initialMinSeats: _filterMinSeats,
+        );
+      },
+    );
+    if (!mounted || result == null) return;
+    setState(() {
+      _filterDate = result.date;
+      _filterMaxPrice = result.maxPrice;
+      _filterMinSeats = result.minSeats;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final LatLng? pickup = widget.userPickupLocation;
     final scheme = Theme.of(context).colorScheme;
+    final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
 
     if (pickup == null) {
       return Scaffold(
@@ -74,8 +185,9 @@ class _FindRideScreenState extends State<FindRideScreen> {
       );
     }
 
-    final double userLat = pickup.latitude;
-    final double userLng = pickup.longitude;
+    final Stream<Set<String>> blockedUsersStream = currentUserUid == null
+        ? Stream.value(<String>{})
+        : SafetyRepository().streamBlockedUserIds(currentUserUid);
 
     return Scaffold(
       appBar: AppBar(
@@ -94,97 +206,177 @@ class _FindRideScreenState extends State<FindRideScreen> {
             ),
           ),
         ),
+        actions: [
+          IconButton(
+            onPressed: _openFilters,
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.tune_rounded),
+                if (_hasFilters)
+                  Positioned(
+                    right: -1,
+                    top: -1,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
-      body: StreamBuilder<List<Ride>>(
-        // Filter rides where the 'date' field is greater than or equal to the current date/time
-        stream: RideRepository().streamAvailableRidesFrom(
-          DateTime.now().subtract(const Duration(days: 1)),
-        ),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Text("${Translations.getText(context, 'error_prefix')} ${snapshot.error}"),
-            );
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.directions_car_outlined, size: 60, color: Colors.grey),
-                  const SizedBox(height: 10),
-                  Text(Translations.getText(context, 'no_trips'), style: const TextStyle(color: Colors.grey)),
-                ],
-              ),
-            );
-          }
-
-          final allRides = snapshot.data!;
-          final Distance distanceCalculator = const Distance();
-
-          // Filter rides that pass near the user (within 3 km radius)
-          final filteredRides = allRides.where((ride) {
-            // 1. Check if potential route points exist
-            if (ride.polylinePoints.isEmpty) {
-              // Fallback: Check start location distance if no route data
-              if (ride.startLat != 0 && ride.startLng != 0) {
-                 return distanceCalculator.as(
-                   LengthUnit.Meter,
-                   pickup,
-                   LatLng(ride.startLat, ride.startLng),
-                 ) < 800;
+      body: StreamBuilder<Set<String>>(
+        stream: blockedUsersStream,
+        builder: (context, blockedSnap) {
+          final blockedUsers = blockedSnap.data ?? <String>{};
+          return StreamBuilder<List<Ride>>(
+            // Filter rides where the 'date' field is greater than or equal to the current date/time
+            stream: RideRepository().streamAvailableRidesFrom(
+              DateTime.now().subtract(const Duration(days: 1)),
+            ),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting || blockedSnap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
               }
-              return false;
-            }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text("${Translations.getText(context, 'error_prefix')} ${snapshot.error}"),
+                );
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.directions_car_outlined, size: 60, color: Colors.grey),
+                      const SizedBox(height: 10),
+                      Text(Translations.getText(context, 'no_trips'), style: const TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                );
+              }
 
-            // 2. Check if ANY point on the route is close to user
-            // Optimization: radius reduced to 800m for better accuracy
-            for (var p in ride.polylinePoints) {
-              final double distInfo = distanceCalculator.as(LengthUnit.Meter, pickup, p);
-              if (distInfo < 800) { // 800 meters tolerance
+              final allRides = snapshot.data!;
+              final Distance distanceCalculator = const Distance();
+
+              // Filter rides that pass near the user (within 800m radius) and ignore blocked drivers.
+              final nearbyRides = allRides.where((ride) {
+                if (blockedUsers.contains(ride.driverId)) return false;
+
+                // 1. Check if potential route points exist
+                if (ride.polylinePoints.isEmpty) {
+                  // Fallback: Check start location distance if no route data
+                  if (ride.startLat != 0 && ride.startLng != 0) {
+                     return distanceCalculator.as(
+                       LengthUnit.Meter,
+                       pickup,
+                       LatLng(ride.startLat, ride.startLng),
+                     ) < 800;
+                  }
+                  return false;
+                }
+
+                // 2. Check if ANY point on the route is close to user
+                // Optimization: radius reduced to 800m for better accuracy
+                for (var p in ride.polylinePoints) {
+                  final double distInfo = distanceCalculator.as(LengthUnit.Meter, pickup, p);
+                  if (distInfo < 800) { // 800 meters tolerance
+                    return true;
+                  }
+                }
+
+                return false;
+              }).toList();
+
+              if (nearbyRides.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.commute_outlined, size: 80, color: Colors.grey[300]),
+                        const SizedBox(height: 20),
+                        Text(
+                          Translations.getText(context, 'no_trips_nearby'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          Translations.getText(context, 'try_move_closer'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              final filteredRides = nearbyRides.where((ride) {
+                if (_filterDate != null && !_isSameDay(ride.date, _filterDate!)) {
+                  return false;
+                }
+                if (_filterMaxPrice != null && ride.price > _filterMaxPrice!) {
+                  return false;
+                }
+                if (_filterMinSeats > 0 && ride.seats < _filterMinSeats) {
+                  return false;
+                }
                 return true;
+              }).toList();
+
+              if (filteredRides.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                      Translations.getText(context, 'filtered_empty'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
+                );
               }
-            }
-
-            return false;
-          }).toList();
-
-          if (filteredRides.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.commute_outlined, size: 80, color: Colors.grey[300]),
-                    const SizedBox(height: 20),
-                    Text(
-                      Translations.getText(context, 'no_trips_nearby'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      Translations.getText(context, 'try_move_closer'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
 
               final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
+              final maxPrice = filteredRides.fold<double>(
+                1.0,
+                (max, ride) => ride.price > max ? ride.price : max,
+              );
+              final now = DateTime.now();
+              final scoredRides = filteredRides
+                  .map((ride) {
+                    final distanceM = _distanceToRideMeters(
+                      ride: ride,
+                      pickup: pickup,
+                      calculator: distanceCalculator,
+                    );
+                    final score = _smartScore(
+                      ride: ride,
+                      distanceMeters: distanceM,
+                      maxPrice: maxPrice,
+                      now: now,
+                    );
+                    return (ride: ride, score: score);
+                  })
+                  .toList()
+                ..sort((a, b) => b.score.compareTo(a.score));
 
               return ListView.builder(
                 padding: const EdgeInsets.all(16.0),
-                itemCount: filteredRides.length,
+                itemCount: scoredRides.length,
                 itemBuilder: (context, index) {
-                  final ride = filteredRides[index];
+                  final item = scoredRides[index];
+                  final ride = item.ride;
+                  final matchPercent = (item.score * 100).round();
                   final rideData = ride.toMap();
 
                   String formattedDate = Translations.getText(context, 'date_unknown');
@@ -230,12 +422,26 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                 children: [
                                   Row(
                                     children: [
-                                      UserAvatar(
-                                        userName: driverName,
-                                        imageUrl: ride.driverPhotoUrl,
-                                        radius: 20,
-                                        backgroundColor: scheme.primary.withOpacity(0.12),
-                                        textColor: scheme.primary,
+                                      GestureDetector(
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => PublicProfileScreen(
+                                                userId: ride.driverId,
+                                                userName: driverName,
+                                                photoUrl: ride.driverPhotoUrl,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        child: UserAvatar(
+                                          userName: driverName,
+                                          imageUrl: ride.driverPhotoUrl,
+                                          radius: 20,
+                                          backgroundColor: scheme.primary.withOpacity(0.12),
+                                          textColor: scheme.primary,
+                                        ),
                                       ),
                                       const SizedBox(width: 10),
                                       Column(
@@ -256,6 +462,8 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                               Text(vehicleLabel, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                                             ],
                                           ),
+                                          const SizedBox(height: 2),
+                                          _buildDriverRating(ride.driverId),
                                         ],
                                       ),
                                     ],
@@ -267,9 +475,22 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(color: scheme.secondary.withOpacity(0.35)),
                                     ),
-                                    child: Text(
-                                      '$price MAD',
-                                      style: TextStyle(color: scheme.secondary, fontWeight: FontWeight.bold, fontSize: 16),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          '$price MAD',
+                                          style: TextStyle(color: scheme.secondary, fontWeight: FontWeight.bold, fontSize: 16),
+                                        ),
+                                        Text(
+                                          '$matchPercent% ${Translations.getText(context, 'match_label')}',
+                                          style: TextStyle(
+                                            color: scheme.onSurfaceVariant,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -428,6 +649,8 @@ class _FindRideScreenState extends State<FindRideScreen> {
                   );
                 },
               );
+            },
+          );
         },
       ),
     );
@@ -438,6 +661,18 @@ class _FindRideScreenState extends State<FindRideScreen> {
     if (user == null) {
       _showSnackBar(context, Translations.getText(context, 'error_not_connected'), Colors.red);
       return;
+    }
+
+    final driverId = rideData['driverId']?.toString();
+    if (driverId != null && driverId.isNotEmpty) {
+      final blocked = await SafetyRepository().isBlocked(
+        blockerId: user.uid,
+        blockedUserId: driverId,
+      );
+      if (blocked) {
+        _showSnackBar(context, Translations.getText(context, 'blocked_action_unavailable'), Colors.red);
+        return;
+      }
     }
 
     // Confirmation Dialog
@@ -475,5 +710,182 @@ class _FindRideScreenState extends State<FindRideScreen> {
       _ => scheme.error,
     };
     _showSnackBar(context, _bookingMessage(result), color);
+  }
+}
+
+class _FindRideFilterResult {
+  final DateTime? date;
+  final double? maxPrice;
+  final int minSeats;
+
+  const _FindRideFilterResult({
+    required this.date,
+    required this.maxPrice,
+    required this.minSeats,
+  });
+}
+
+class _FindRideFiltersSheet extends StatefulWidget {
+  final DateTime? initialDate;
+  final double? initialMaxPrice;
+  final int initialMinSeats;
+
+  const _FindRideFiltersSheet({
+    required this.initialDate,
+    required this.initialMaxPrice,
+    required this.initialMinSeats,
+  });
+
+  @override
+  State<_FindRideFiltersSheet> createState() => _FindRideFiltersSheetState();
+}
+
+class _FindRideFiltersSheetState extends State<_FindRideFiltersSheet> {
+  late final TextEditingController _maxPriceController;
+  DateTime? _selectedDate;
+  late int _minSeats;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.initialDate;
+    _minSeats = widget.initialMinSeats;
+    _maxPriceController = TextEditingController(
+      text: widget.initialMaxPrice?.toStringAsFixed(1) ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _maxPriceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  void _apply() {
+    final raw = _maxPriceController.text.trim().replaceAll(',', '.');
+    double? parsed;
+    if (raw.isNotEmpty) {
+      parsed = double.tryParse(raw);
+      if (parsed == null || parsed < 0) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(Translations.getText(context, 'filter_invalid_price'))),
+        );
+        return;
+      }
+    }
+
+    Navigator.pop(
+      context,
+      _FindRideFilterResult(
+        date: _selectedDate,
+        maxPrice: parsed,
+        minSeats: _minSeats,
+      ),
+    );
+  }
+
+  void _clear() {
+    Navigator.pop(
+      context,
+      const _FindRideFilterResult(
+        date: null,
+        maxPrice: null,
+        minSeats: 0,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            Translations.getText(context, 'filters'),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(Translations.getText(context, 'date')),
+            subtitle: Text(
+              _selectedDate == null
+                  ? Translations.getText(context, 'filter_all_dates')
+                  : DateFormat('dd/MM/yyyy').format(_selectedDate!),
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.calendar_today_outlined),
+              onPressed: _pickDate,
+            ),
+          ),
+          TextField(
+            controller: _maxPriceController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: "${Translations.getText(context, 'price')} (MAD)",
+              hintText: Translations.getText(context, 'filter_any_price'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<int>(
+            initialValue: _minSeats,
+            decoration: InputDecoration(
+              labelText: Translations.getText(context, 'seats'),
+            ),
+            items: const [0, 1, 2, 3, 4]
+                .map(
+                  (value) => DropdownMenuItem<int>(
+                    value: value,
+                    child: Text(
+                      value == 0
+                          ? Translations.getText(context, 'filter_any_seats')
+                          : '$value+',
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _minSeats = value);
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              TextButton(
+                onPressed: _clear,
+                child: Text(Translations.getText(context, 'clear_filters')),
+              ),
+              const Spacer(),
+              ElevatedButton(
+                onPressed: _apply,
+                child: Text(Translations.getText(context, 'filter_apply')),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

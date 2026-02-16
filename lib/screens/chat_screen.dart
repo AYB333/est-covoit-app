@@ -11,7 +11,10 @@ import '../models/ride.dart';
 import '../repositories/booking_repository.dart';
 import '../repositories/chat_repository.dart';
 import '../repositories/ride_repository.dart';
+import '../repositories/safety_repository.dart';
 import '../repositories/user_repository.dart';
+import 'public_profile_screen.dart';
+import 'report_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String bookingId;
@@ -35,6 +38,13 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+  bool _isBlocked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBlockState();
+  }
 
   @override
   void dispose() {
@@ -44,6 +54,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _sendMessage() async {
+    if (_isBlocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(Translations.getText(context, 'blocked_chat_disabled'))),
+      );
+      return;
+    }
+
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
     _messageController.clear();
@@ -77,6 +94,76 @@ class _ChatScreenState extends State<ChatScreen> {
         SnackBar(content: Text("${Translations.getText(context, 'error_prefix')} $e")),
       );
     }
+  }
+
+  void _openOtherUserProfile(String name, String? photoUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PublicProfileScreen(
+          userId: widget.otherUserId,
+          userName: name,
+          photoUrl: photoUrl,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadBlockState() async {
+    final blocked = await SafetyRepository().isBlocked(
+      blockerId: currentUserId,
+      blockedUserId: widget.otherUserId,
+    );
+    if (!mounted) return;
+    setState(() => _isBlocked = blocked);
+  }
+
+  Future<void> _toggleBlock() async {
+    if (_isBlocked) {
+      await SafetyRepository().unblockUser(
+        blockerId: currentUserId,
+        blockedUserId: widget.otherUserId,
+      );
+    } else {
+      await SafetyRepository().blockUser(
+        blockerId: currentUserId,
+        blockedUserId: widget.otherUserId,
+      );
+    }
+    if (!mounted) return;
+    setState(() => _isBlocked = !_isBlocked);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          Translations.getText(
+            context,
+            _isBlocked ? 'user_blocked_success' : 'user_unblocked_success',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _reportUser() async {
+    final String? result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReportScreen(
+          reporterId: currentUserId,
+          reportedUserId: widget.otherUserId,
+          contextId: widget.bookingId,
+        ),
+      ),
+    );
+
+    if (!mounted || result == null) return;
+
+    final String message = result == 'sent'
+        ? Translations.getText(context, 'report_sent')
+        : Translations.getText(context, 'error_processing');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   void _deleteMessage(String messageId) {
@@ -155,38 +242,44 @@ class _ChatScreenState extends State<ChatScreen> {
                      if (ride != null && booking.driverId == widget.otherUserId) {
                         photoUrl = ride.driverPhotoUrl;
                      }
-                     return Row(
-                      children: [
-                        UserAvatar(
-                          userName: name,
-                          imageUrl: photoUrl,
-                          radius: 18,
-                          backgroundColor: scheme.primary.withOpacity(0.18),
-                          textColor: scheme.onPrimary,
-                          fontSize: 14,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(name, style: const TextStyle(fontSize: 18, color: Colors.white)),
-                      ],
-                    );
+                     return GestureDetector(
+                       onTap: () => _openOtherUserProfile(name, photoUrl),
+                       child: Row(
+                        children: [
+                          UserAvatar(
+                            userName: name,
+                            imageUrl: photoUrl,
+                            radius: 18,
+                            backgroundColor: scheme.primary.withOpacity(0.18),
+                            textColor: scheme.onPrimary,
+                            fontSize: 14,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(name, style: const TextStyle(fontSize: 18, color: Colors.white)),
+                        ],
+                      ),
+                     );
                    }
                  );
               }
             }
 
-            return Row(
-              children: [
-                UserAvatar(
-                  userName: name,
-                  imageUrl: photoUrl,
-                  radius: 18,
-                  backgroundColor: scheme.primary.withOpacity(0.18),
-                  textColor: scheme.onPrimary,
-                  fontSize: 14,
-                ),
-                const SizedBox(width: 10),
-                Text(name, style: const TextStyle(fontSize: 18, color: Colors.white)),
-              ],
+            return GestureDetector(
+              onTap: () => _openOtherUserProfile(name, photoUrl),
+              child: Row(
+                children: [
+                  UserAvatar(
+                    userName: name,
+                    imageUrl: photoUrl,
+                    radius: 18,
+                    backgroundColor: scheme.primary.withOpacity(0.18),
+                    textColor: scheme.onPrimary,
+                    fontSize: 14,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(name, style: const TextStyle(fontSize: 18, color: Colors.white)),
+                ],
+              ),
             );
           }
         ),
@@ -208,6 +301,31 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             icon: const Icon(Icons.phone),
             onPressed: _callUser,
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) async {
+              if (value == 'report') {
+                await _reportUser();
+              } else if (value == 'block_toggle') {
+                await _toggleBlock();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem<String>(
+                value: 'report',
+                child: Text(Translations.getText(context, 'report_user')),
+              ),
+              PopupMenuItem<String>(
+                value: 'block_toggle',
+                child: Text(
+                  Translations.getText(
+                    context,
+                    _isBlocked ? 'unblock_user' : 'block_user',
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -341,8 +459,11 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       child: TextField(
                         controller: _messageController,
+                        enabled: !_isBlocked,
                         decoration: InputDecoration(
-                          hintText: Translations.getText(context, 'write_message_hint'),
+                          hintText: _isBlocked
+                              ? Translations.getText(context, 'blocked_chat_disabled')
+                              : Translations.getText(context, 'write_message_hint'),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           hintStyle: TextStyle(color: scheme.onSurfaceVariant),
@@ -354,10 +475,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(width: 10),
                   GestureDetector(
-                    onTap: _sendMessage,
+                    onTap: _isBlocked ? null : _sendMessage,
                     child: CircleAvatar(
                       radius: 24,
-                      backgroundColor: scheme.primary,
+                      backgroundColor: _isBlocked ? scheme.outline : scheme.primary,
                       child: Icon(Icons.send_rounded, color: scheme.onPrimary, size: 22),
                     ),
                   ),

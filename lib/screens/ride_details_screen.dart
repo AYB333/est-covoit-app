@@ -502,7 +502,6 @@ if (mounted) Navigator.pop(context); // Revenir au Dashboard
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 100.0),
