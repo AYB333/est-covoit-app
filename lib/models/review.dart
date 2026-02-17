@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// --- MODEL: REVIEW ---
 class Review {
   final String id;
   final String bookingId;
@@ -21,11 +22,13 @@ class Review {
     this.createdAt,
   });
 
+  // --- FROM FIRESTORE DOC ---
   factory Review.fromDoc(DocumentSnapshot doc) {
     final data = (doc.data() as Map<String, dynamic>?) ?? {};
     return Review.fromMap(data, id: doc.id);
   }
 
+  // --- FROM MAP ---
   factory Review.fromMap(Map<String, dynamic> data, {String id = ''}) {
     final createdAtTs = data['createdAt'] as Timestamp?;
     return Review(
@@ -40,6 +43,7 @@ class Review {
     );
   }
 
+  // --- TO MAP ---
   Map<String, dynamic> toMap() {
     return {
       'bookingId': bookingId,

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// --- MODEL: USER PROFILE ---
 class UserProfile {
   final String id;
   final String? phoneNumber;
@@ -15,11 +16,13 @@ class UserProfile {
     this.ratingCount = 0,
   });
 
+  // --- FROM FIRESTORE DOC ---
   factory UserProfile.fromDoc(DocumentSnapshot doc) {
     final data = (doc.data() as Map<String, dynamic>?) ?? {};
     return UserProfile.fromMap(data, id: doc.id);
   }
 
+  // --- FROM MAP ---
   factory UserProfile.fromMap(Map<String, dynamic> data, {String id = ''}) {
     return UserProfile(
       id: id,
@@ -30,6 +33,7 @@ class UserProfile {
     );
   }
 
+  // --- TO MAP ---
   Map<String, dynamic> toMap() {
     return {
       'phoneNumber': phoneNumber,

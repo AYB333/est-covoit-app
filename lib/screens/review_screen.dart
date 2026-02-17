@@ -4,6 +4,7 @@ import '../config/translations.dart';
 import '../models/booking.dart';
 import '../repositories/review_repository.dart';
 
+// --- SCREEN: REVIEW ---
 class ReviewScreen extends StatefulWidget {
   final Booking booking;
   final String reviewerId;
@@ -19,6 +20,7 @@ class ReviewScreen extends StatefulWidget {
 }
 
 class _ReviewScreenState extends State<ReviewScreen> {
+  // --- STATE ---
   final TextEditingController _commentController = TextEditingController();
   int _selectedRating = 5;
   bool _isSubmitting = false;
@@ -29,6 +31,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
     super.dispose();
   }
 
+  // --- SUBMIT REVIEW ---
   Future<void> _submitReview() async {
     if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
@@ -62,7 +65,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: scheme.background,
+      backgroundColor: scheme.surfaceContainerLowest,
+      // --- APPBAR ---
       appBar: AppBar(
         title: Text(Translations.getText(context, 'review_title')),
         backgroundColor: Colors.transparent,
@@ -80,6 +84,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
           ),
         ),
       ),
+      // --- BODY: FORM ---
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -127,7 +132,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   decoration: InputDecoration(
                     hintText: Translations.getText(context, 'review_hint'),
                     filled: true,
-                    fillColor: scheme.background.withValues(alpha: 0.35),
+                    fillColor: scheme.surfaceContainerLowest.withValues(alpha: 0.35),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: scheme.outline.withValues(alpha: 0.5)),
@@ -148,7 +153,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: scheme.primary,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: scheme.surfaceVariant,
+                    disabledBackgroundColor: scheme.surfaceContainerHighest,
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

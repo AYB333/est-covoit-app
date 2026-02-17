@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+// --- PALETTE: COLORS BASE ---
 class AppPalette {
   static const Color blue = Color(0xFF1F4ED8);
   static const Color blueDeep = Color(0xFF14379B);
@@ -17,7 +18,9 @@ class AppPalette {
   static const Color nightSurfaceAlt = Color(0xFF1A2335);
 }
 
+// --- THEME: LIGHT / DARK ---
 class AppTheme {
+  // --- LIGHT THEME ---
   static ThemeData light() {
     final scheme = ColorScheme(
       brightness: Brightness.light,
@@ -29,17 +32,17 @@ class AppTheme {
       onTertiary: AppPalette.ink,
       error: AppPalette.coral,
       onError: Colors.white,
-      background: AppPalette.surfaceAlt,
-      onBackground: AppPalette.ink,
       surface: AppPalette.surface,
       onSurface: AppPalette.ink,
-      surfaceVariant: AppPalette.surfaceAlt,
-      onSurfaceVariant: AppPalette.ink.withOpacity(0.72),
+      surfaceContainerLowest: AppPalette.surfaceAlt,
+      surfaceContainerHighest: AppPalette.surfaceAlt,
+      onSurfaceVariant: AppPalette.ink.withValues(alpha: 0.72),
       outline: AppPalette.stroke,
     );
     return _baseTheme(scheme);
   }
 
+  // --- DARK THEME ---
   static ThemeData dark() {
     final scheme = ColorScheme(
       brightness: Brightness.dark,
@@ -51,17 +54,17 @@ class AppTheme {
       onTertiary: const Color(0xFF1B1F2A),
       error: const Color(0xFFFF7A7A),
       onError: const Color(0xFF0B0F1A),
-      background: AppPalette.night,
-      onBackground: Colors.white,
       surface: AppPalette.nightSurface,
       onSurface: Colors.white,
-      surfaceVariant: AppPalette.nightSurfaceAlt,
+      surfaceContainerLowest: AppPalette.night,
+      surfaceContainerHighest: AppPalette.nightSurfaceAlt,
       onSurfaceVariant: Colors.white70,
       outline: const Color(0xFF2A3650),
     );
     return _baseTheme(scheme);
   }
 
+  // --- BASE THEME SETUP ---
   static ThemeData _baseTheme(ColorScheme scheme) {
     final base = ThemeData(
       colorScheme: scheme,
@@ -82,13 +85,13 @@ class AppTheme {
 
     return base.copyWith(
       textTheme: textTheme.apply(bodyColor: scheme.onSurface, displayColor: scheme.onSurface),
-      scaffoldBackgroundColor: scheme.background,
+      scaffoldBackgroundColor: scheme.surfaceContainerLowest,
       appBarTheme: AppBarTheme(
-        backgroundColor: scheme.background,
-        foregroundColor: scheme.onBackground,
+        backgroundColor: scheme.surfaceContainerLowest,
+        foregroundColor: scheme.onSurface,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: textTheme.titleLarge?.copyWith(color: scheme.onBackground),
+        titleTextStyle: textTheme.titleLarge?.copyWith(color: scheme.onSurface),
       ),
       cardTheme: CardThemeData(
         color: scheme.surface,
@@ -126,7 +129,7 @@ class AppTheme {
           borderSide: BorderSide(color: scheme.error),
         ),
         labelStyle: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-        hintStyle: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant.withOpacity(0.8)),
+        hintStyle: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant.withValues(alpha: 0.8)),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -153,13 +156,13 @@ class AppTheme {
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: scheme.surfaceVariant,
-        selectedColor: scheme.primary.withOpacity(0.12),
+        backgroundColor: scheme.surfaceContainerHighest,
+        selectedColor: scheme.primary.withValues(alpha: 0.12),
         labelStyle: textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       dividerTheme: DividerThemeData(
-        color: scheme.outline.withOpacity(0.6),
+        color: scheme.outline.withValues(alpha: 0.6),
         thickness: 1,
         space: 24,
       ),
@@ -171,14 +174,14 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.surface,
-        indicatorColor: scheme.primary.withOpacity(0.14),
+        indicatorColor: scheme.primary.withValues(alpha: 0.14),
         elevation: 0,
-        labelTextStyle: MaterialStatePropertyAll(
+        labelTextStyle: WidgetStatePropertyAll(
           textTheme.bodySmall?.copyWith(color: scheme.onSurface),
         ),
-        iconTheme: MaterialStateProperty.resolveWith(
+        iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
-            color: states.contains(MaterialState.selected) ? scheme.primary : scheme.onSurfaceVariant,
+            color: states.contains(WidgetState.selected) ? scheme.primary : scheme.onSurfaceVariant,
           ),
         ),
       ),

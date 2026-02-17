@@ -7,6 +7,7 @@ import '../config/translations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
 
+// --- SCREEN: SETTINGS ---
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -15,14 +16,17 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  // --- STATE: NOTIFICATIONS ---
   bool _notificationsEnabled = true;
 
   @override
   void initState() {
     super.initState();
+    // --- LOAD PREFS ---
     _loadPreferences();
   }
 
+  // --- READ PREFERENCES ---
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -30,6 +34,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  // --- TOGGLE NOTIFICATIONS ---
   Future<void> _toggleNotifications(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     
@@ -66,6 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final languageNames = Translations.getLanguageNames();
 
     return Scaffold(
+      // --- APPBAR ---
       appBar: AppBar(
         title: Text(Translations.getText(context, 'settings_title')),
         backgroundColor: Colors.transparent,
@@ -84,18 +90,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      // --- BODY: SECTIONS ---
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // --- APPARENCE SECTION ---
+          // --- SECTION: APPEARANCE ---
           _buildSectionHeader(Translations.getText(context, 'appearance_section')),
           Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor.withOpacity(0.7),
+              color: Theme.of(context).cardColor.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 )
@@ -113,15 +120,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
 
-          // --- GÉNÉRAL SECTION ---
+          // --- SECTION: GENERAL ---
           _buildSectionHeader(Translations.getText(context, 'general_section')),
           Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor.withOpacity(0.7),
+              color: Theme.of(context).cardColor.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 )
@@ -139,7 +146,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   secondary: const Icon(Icons.notifications),
                 ),
                 Divider(
-                  color: Colors.grey.withOpacity(0.3),
+                  color: Colors.grey.withValues(alpha: 0.3),
                   height: 1,
                 ),
                 Padding(
@@ -186,15 +193,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
 
-          // --- PROFIL SECTION ---
+          // --- SECTION: PROFILE ---
           _buildSectionHeader(Translations.getText(context, 'profile_section')),
           Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor.withOpacity(0.7),
+              color: Theme.of(context).cardColor.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 )
@@ -217,15 +224,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
 
-          // --- SUPPORT SECTION ---
+          // --- SECTION: SUPPORT ---
           _buildSectionHeader(Translations.getText(context, 'support_section')),
           Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor.withOpacity(0.7),
+              color: Theme.of(context).cardColor.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 )
@@ -252,7 +259,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
                 Divider(
-                  color: Colors.grey.withOpacity(0.3),
+                  color: Colors.grey.withValues(alpha: 0.3),
                   height: 1,
                 ),
                 ListTile(
@@ -279,7 +286,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
 
-          // --- INFO texte ---
+          // --- INFO ---
           Center(
             child: Text(
               'Version 1.0.0',
@@ -292,7 +299,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // Helper widget to create section headers
+  // --- SECTION HEADER WIDGET ---
   Widget _buildSectionHeader(String title) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(

@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 
 import '../repositories/user_repository.dart';
 
+// --- SERVICE: AUTH ---
 class AuthService {
   final FirebaseAuth _auth;
   final FirebaseStorage _storage;
@@ -18,6 +19,7 @@ class AuthService {
         _storage = storage ?? FirebaseStorage.instance,
         _users = users ?? UserRepository();
 
+  // --- SIGN IN ---
   Future<UserCredential> signIn({
     required String email,
     required String password,
@@ -28,10 +30,12 @@ class AuthService {
     );
   }
 
+  // --- SIGN OUT ---
   Future<void> signOut() {
     return _auth.signOut();
   }
 
+  // --- SIGN UP (AUTH + STORAGE + FIRESTORE) ---
   Future<UserCredential> signUp({
     required String name,
     required String email,

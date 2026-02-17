@@ -16,6 +16,7 @@ import '../repositories/safety_repository.dart';
 import '../repositories/user_repository.dart';
 
 
+// --- SCREEN: FIND RIDE ---
 class FindRideScreen extends StatefulWidget {
   final LatLng? userPickupLocation;
 
@@ -26,6 +27,7 @@ class FindRideScreen extends StatefulWidget {
 }
 
 class _FindRideScreenState extends State<FindRideScreen> {
+  // --- FILTERS STATE ---
   DateTime? _filterDate;
   double? _filterMaxPrice;
   int _filterMinSeats = 0;
@@ -33,6 +35,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
   bool get _hasFilters =>
       _filterDate != null || _filterMaxPrice != null || _filterMinSeats > 0;
 
+  // --- SNACKBAR ---
   void _showSnackBar(BuildContext context, String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -45,6 +48,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
     );
   }
 
+  // --- BOOKING RESULT MESSAGE ---
   String _bookingMessage(BookingCreateResult result) {
     switch (result.status) {
       case BookingCreateStatus.success:
@@ -58,6 +62,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
     }
   }
 
+  // --- DRIVER RATING WIDGET ---
   Widget _buildDriverRating(String driverId) {
     final scheme = Theme.of(context).colorScheme;
     return StreamBuilder<UserProfile?>(
@@ -87,6 +92,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
     );
   }
 
+  // --- DISTANCE: pickup -> ride (polyline/start) ---
   double _distanceToRideMeters({
     required Ride ride,
     required LatLng pickup,
@@ -112,6 +118,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
     return 100000;
   }
 
+  // --- SMART SCORE (distance/price/time/seats) ---
   double _smartScore({
     required Ride ride,
     required double distanceMeters,
@@ -133,6 +140,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
+  // --- OPEN FILTERS SHEET ---
   Future<void> _openFilters() async {
     final result = await showModalBottomSheet<_FindRideFilterResult>(
       context: context,
@@ -162,6 +170,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
     final scheme = Theme.of(context).colorScheme;
     final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
 
+    // --- GUARD: PICKUP REQUIRED ---
     if (pickup == null) {
       return Scaffold(
         appBar: AppBar(
@@ -189,6 +198,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
         ? Stream.value(<String>{})
         : SafetyRepository().streamBlockedUserIds(currentUserUid);
 
+    // --- MAIN UI ---
     return Scaffold(
       appBar: AppBar(
         title: Text(Translations.getText(context, 'available_trips')),
@@ -231,6 +241,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
           ),
         ],
       ),
+      // --- STREAM: BLOCKED USERS + RIDES ---
       body: StreamBuilder<Set<String>>(
         stream: blockedUsersStream,
         builder: (context, blockedSnap) {
@@ -370,6 +381,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                   .toList()
                 ..sort((a, b) => b.score.compareTo(a.score));
 
+              // --- LIST: MATCHED RIDES ---
               return ListView.builder(
                 padding: const EdgeInsets.all(16.0),
                 itemCount: scoredRides.length,
@@ -439,7 +451,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                           userName: driverName,
                                           imageUrl: ride.driverPhotoUrl,
                                           radius: 20,
-                                          backgroundColor: scheme.primary.withOpacity(0.12),
+                                          backgroundColor: scheme.primary.withValues(alpha: 0.12),
                                           textColor: scheme.primary,
                                         ),
                                       ),
@@ -471,9 +483,9 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: scheme.secondary.withOpacity(0.12),
+                                      color: scheme.secondary.withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: scheme.secondary.withOpacity(0.35)),
+                                      border: Border.all(color: scheme.secondary.withValues(alpha: 0.35)),
                                     ),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -515,7 +527,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 10),
-                                    child: Icon(Icons.arrow_forward, color: scheme.primary.withOpacity(0.6)),
+                                    child: Icon(Icons.arrow_forward, color: scheme.primary.withValues(alpha: 0.6)),
                                   ),
                                   Expanded(
                                     child: Column(
@@ -603,7 +615,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: scheme.primary,
                                           foregroundColor: Colors.white,
-                                          disabledBackgroundColor: scheme.surfaceVariant,
+                                          disabledBackgroundColor: scheme.surfaceContainerHighest,
                                         ),
                                       ),
                                     ),
@@ -618,7 +630,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
                           Positioned.fill(
                             child: Container(
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.85),
+                                color: Colors.white.withValues(alpha: 0.85),
                                 borderRadius: BorderRadius.circular(15),
                               ),
                               child: Center(
@@ -656,6 +668,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
     );
   }
 
+  // --- RESERVE RIDE FLOW ---
   Future<void> _reserveRide(BuildContext context, String rideId, Map<String, dynamic> rideData) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -669,6 +682,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
         blockerId: user.uid,
         blockedUserId: driverId,
       );
+      if (!context.mounted) return;
       if (blocked) {
         _showSnackBar(context, Translations.getText(context, 'blocked_action_unavailable'), Colors.red);
         return;
@@ -694,6 +708,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
       ),
     );
 
+    if (!context.mounted) return;
     if (confirm != true) return;
 
     final result = await BookingService.reserveRide(
@@ -713,6 +728,7 @@ class _FindRideScreenState extends State<FindRideScreen> {
   }
 }
 
+// --- FILTER RESULT MODEL ---
 class _FindRideFilterResult {
   final DateTime? date;
   final double? maxPrice;
@@ -725,6 +741,7 @@ class _FindRideFilterResult {
   });
 }
 
+// --- FILTERS SHEET (UI) ---
 class _FindRideFiltersSheet extends StatefulWidget {
   final DateTime? initialDate;
   final double? initialMaxPrice;
@@ -740,6 +757,7 @@ class _FindRideFiltersSheet extends StatefulWidget {
   State<_FindRideFiltersSheet> createState() => _FindRideFiltersSheetState();
 }
 
+// --- FILTERS SHEET STATE ---
 class _FindRideFiltersSheetState extends State<_FindRideFiltersSheet> {
   late final TextEditingController _maxPriceController;
   DateTime? _selectedDate;

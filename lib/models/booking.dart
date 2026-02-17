@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// --- MODEL: BOOKING ---
 class Booking {
   final String id;
   final String rideId;
@@ -35,11 +36,13 @@ class Booking {
     this.departureAddress,
   });
 
+  // --- FROM FIRESTORE DOC ---
   factory Booking.fromDoc(DocumentSnapshot doc) {
     final data = (doc.data() as Map<String, dynamic>?) ?? {};
     return Booking.fromMap(data, id: doc.id);
   }
 
+  // --- FROM MAP ---
   factory Booking.fromMap(Map<String, dynamic> data, {String id = ''}) {
     final Timestamp? ts = data['timestamp'] as Timestamp?;
     final Timestamp? rideTs = data['rideDate'] as Timestamp?;
@@ -62,6 +65,7 @@ class Booking {
     );
   }
 
+  // --- TO MAP ---
   Map<String, dynamic> toMap() {
     return {
       'rideId': rideId,

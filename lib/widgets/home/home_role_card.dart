@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// --- ROLE CARD WIDGET ---
 class HomeRoleCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -21,6 +22,7 @@ class HomeRoleCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    // --- CARD UI ---
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -42,6 +44,7 @@ class HomeRoleCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // --- ICON ---
             Container(
               height: 52,
               width: 52,
@@ -56,6 +59,7 @@ class HomeRoleCard extends StatelessWidget {
               child: Icon(icon, size: 26, color: Colors.white),
             ),
             const SizedBox(width: 12),
+            // --- TEXTS ---
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -82,6 +86,7 @@ class HomeRoleCard extends StatelessWidget {
                 ],
               ),
             ),
+            // --- ARROW ---
             Container(
               height: 30,
               width: 30,

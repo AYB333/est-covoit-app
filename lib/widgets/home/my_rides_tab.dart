@@ -14,11 +14,14 @@ class MyRidesTab extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final int safeInitialIndex =
         initialTabIndex < 0 ? 0 : (initialTabIndex > 1 ? 1 : initialTabIndex);
+
+    // --- TABS CONTAINER ---
     return DefaultTabController(
       length: 2,
       initialIndex: safeInitialIndex,
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        // --- APPBAR + TABS ---
         appBar: AppBar(
           title: Text(Translations.getText(context, 'my_activities')),
           backgroundColor: Colors.transparent,
@@ -46,6 +49,7 @@ class MyRidesTab extends StatelessWidget {
             ],
           ),
         ),
+        // --- TABS CONTENT ---
         body: const TabBarView(
           children: [
             DriverRidesList(),

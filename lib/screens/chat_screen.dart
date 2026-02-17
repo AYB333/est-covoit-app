@@ -16,6 +16,7 @@ import '../repositories/user_repository.dart';
 import 'public_profile_screen.dart';
 import 'report_screen.dart';
 
+// --- SCREEN: CHAT ---
 class ChatScreen extends StatefulWidget {
   final String bookingId;
   final String otherUserName;
@@ -35,6 +36,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  // --- CONTROLLERS + STATE ---
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
@@ -43,6 +45,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    // --- LOAD BLOCK STATE ---
     _loadBlockState();
   }
 
@@ -53,6 +56,7 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  // --- SEND MESSAGE ---
   void _sendMessage() async {
     if (_isBlocked) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -73,6 +77,7 @@ class _ChatScreenState extends State<ChatScreen> {
         timestamp: null,
       );
       await ChatRepository().sendMessage(widget.bookingId, message);
+      if (!mounted) return;
       
       // Notify Other User
       NotificationService.sendNotification(
@@ -90,12 +95,14 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("${Translations.getText(context, 'error_prefix')} $e")),
       );
     }
   }
 
+  // --- OPEN OTHER PROFILE ---
   void _openOtherUserProfile(String name, String? photoUrl) {
     Navigator.push(
       context,
@@ -109,6 +116,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // --- LOAD BLOCK STATUS ---
   Future<void> _loadBlockState() async {
     final blocked = await SafetyRepository().isBlocked(
       blockerId: currentUserId,
@@ -118,6 +126,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _isBlocked = blocked);
   }
 
+  // --- BLOCK / UNBLOCK ---
   Future<void> _toggleBlock() async {
     if (_isBlocked) {
       await SafetyRepository().unblockUser(
@@ -144,6 +153,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // --- REPORT USER ---
   Future<void> _reportUser() async {
     final String? result = await Navigator.push<String>(
       context,
@@ -166,6 +176,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // --- DELETE MESSAGE ---
   void _deleteMessage(String messageId) {
     showDialog(
       context: context,
@@ -192,20 +203,27 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // --- CALL OTHER USER ---
   void _callUser() async {
     try {
       final phone = await UserRepository().fetchPhoneNumber(widget.otherUserId);
+      if (!mounted) return;
       if (phone != null && phone.isNotEmpty) {
          final Uri url = Uri.parse("tel:$phone");
-         if (await canLaunchUrl(url)) {
+         final canLaunch = await canLaunchUrl(url);
+         if (!mounted) return;
+         if (canLaunch) {
            await launchUrl(url);
          } else {
-           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Translations.getText(context, 'action_impossible'))));
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text(Translations.getText(context, 'action_impossible'))),
+           );
          }
       } else {
          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Translations.getText(context, 'number_unavailable'))));
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("${Translations.getText(context, 'error_prefix')} $e")),
       );
@@ -216,6 +234,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      // --- APPBAR ---
       appBar: AppBar(
         title: StreamBuilder<Booking?>(
           stream: BookingRepository().streamBooking(widget.bookingId),
@@ -250,7 +269,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             userName: name,
                             imageUrl: photoUrl,
                             radius: 18,
-                            backgroundColor: scheme.primary.withOpacity(0.18),
+                            backgroundColor: scheme.primary.withValues(alpha: 0.18),
                             textColor: scheme.onPrimary,
                             fontSize: 14,
                           ),
@@ -272,7 +291,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     userName: name,
                     imageUrl: photoUrl,
                     radius: 18,
-                    backgroundColor: scheme.primary.withOpacity(0.18),
+                    backgroundColor: scheme.primary.withValues(alpha: 0.18),
                     textColor: scheme.onPrimary,
                     fontSize: 14,
                   ),
@@ -329,8 +348,9 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
+      // --- BODY: MESSAGES + INPUT ---
       body: Container(
-        color: scheme.background, // Light Chat Background
+        color: scheme.surfaceContainerLowest, // Light Chat Background
         child: Column(
           children: [
             Expanded(
@@ -391,7 +411,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   : null,
                               color: isMe ? null : scheme.surface,
                               boxShadow: [
-                                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 3, offset: const Offset(0, 1))
+                                BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 3, offset: const Offset(0, 1))
                               ],
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(18),
@@ -439,13 +459,13 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             
-            // Input Area
+            // --- INPUT AREA ---
             Container(
               padding: const EdgeInsets.fromLTRB(10, 10, 10, 15),
               decoration: BoxDecoration(
                 color: scheme.surface,
                 boxShadow: [
-                  BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 10, offset: const Offset(0, -2))
+                  BoxShadow(color: Colors.grey.withValues(alpha: 0.1), spreadRadius: 1, blurRadius: 10, offset: const Offset(0, -2))
                 ],
               ),
               child: Row(
@@ -453,7 +473,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: scheme.surfaceVariant,
+                        color: scheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(25),
                         border: Border.all(color: scheme.outline),
                       ),

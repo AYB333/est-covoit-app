@@ -5,8 +5,10 @@ import '../models/booking.dart';
 import '../repositories/booking_repository.dart';
 import '../repositories/user_repository.dart';
 
+// --- STATUS: CREATE BOOKING ---
 enum BookingCreateStatus { success, alreadyExists, error, invalidData }
 
+// --- RESULT: CREATE BOOKING ---
 class BookingCreateResult {
   final BookingCreateStatus status;
   final String message;
@@ -15,7 +17,9 @@ class BookingCreateResult {
   const BookingCreateResult(this.status, this.message, [this.error]);
 }
 
+// --- SERVICE: BOOKING ---
 class BookingService {
+  // --- RESERVE RIDE FLOW ---
   static Future<BookingCreateResult> reserveRide({
     required User user,
     required String rideId,

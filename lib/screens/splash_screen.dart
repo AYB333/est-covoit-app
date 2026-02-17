@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// --- WIDGET: SPLASH GATE (DELAY) ---
 class SplashGate extends StatefulWidget {
   final Widget child;
   final Duration duration;
@@ -15,6 +16,7 @@ class SplashGate extends StatefulWidget {
 }
 
 class _SplashGateState extends State<SplashGate> {
+  // --- STATE: SHOW SPLASH ---
   bool _showSplash = true;
 
   @override
@@ -28,6 +30,7 @@ class _SplashGateState extends State<SplashGate> {
 
   @override
   Widget build(BuildContext context) {
+    // --- SWITCH BETWEEN SPLASH AND CHILD ---
     if (_showSplash) {
       return const SplashScreen();
     }
@@ -35,6 +38,7 @@ class _SplashGateState extends State<SplashGate> {
   }
 }
 
+// --- SCREEN: SPLASH IMAGE ---
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// --- MODEL: APP NOTIFICATION ---
 class AppNotification {
   final String id;
   final String receiverId;
@@ -21,11 +22,13 @@ class AppNotification {
     this.timestamp,
   });
 
+  // --- FROM FIRESTORE DOC ---
   factory AppNotification.fromDoc(DocumentSnapshot doc) {
     final data = (doc.data() as Map<String, dynamic>?) ?? {};
     return AppNotification.fromMap(data, id: doc.id);
   }
 
+  // --- FROM MAP ---
   factory AppNotification.fromMap(Map<String, dynamic> data, {String id = ''}) {
     final Timestamp? ts = data['timestamp'] as Timestamp?;
     return AppNotification(
@@ -40,6 +43,7 @@ class AppNotification {
     );
   }
 
+  // --- TO MAP ---
   Map<String, dynamic> toMap() {
     return {
       'receiverId': receiverId,

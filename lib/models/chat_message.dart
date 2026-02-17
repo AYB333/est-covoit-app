@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// --- MODEL: CHAT MESSAGE ---
 class ChatMessage {
   final String id;
   final String text;
@@ -13,11 +14,13 @@ class ChatMessage {
     this.timestamp,
   });
 
+  // --- FROM FIRESTORE DOC ---
   factory ChatMessage.fromDoc(DocumentSnapshot doc) {
     final data = (doc.data() as Map<String, dynamic>?) ?? {};
     return ChatMessage.fromMap(data, id: doc.id);
   }
 
+  // --- FROM MAP ---
   factory ChatMessage.fromMap(Map<String, dynamic> data, {String id = ''}) {
     final Timestamp? ts = data['timestamp'] as Timestamp?;
     return ChatMessage(
@@ -28,6 +31,7 @@ class ChatMessage {
     );
   }
 
+  // --- TO MAP ---
   Map<String, dynamic> toMap() {
     return {
       'text': text,

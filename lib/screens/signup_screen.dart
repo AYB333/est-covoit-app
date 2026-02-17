@@ -7,6 +7,7 @@ import '../config/translations.dart';
 import '../widgets/user_avatar.dart';
 import '../services/auth_service.dart';
 
+// --- SCREEN: SIGNUP ---
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
@@ -15,6 +16,7 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
+  // --- CONTROLLERS + STATE ---
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -23,6 +25,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   File? _selectedImage;
 
+  // --- PICK IMAGE (GALLERY) ---
   Future<void> _pickImage() async {
     // Create a picker instance
     final picker = ImagePicker();
@@ -36,6 +39,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
+  // --- SIGNUP LOGIC ---
   Future<void> _signUp() async {
     // Basic validation: all fields required
     if (_nameController.text.isEmpty ||
@@ -107,6 +111,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
+  // --- ERROR SNACKBAR ---
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -135,6 +140,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
+      // --- BACKGROUND + FORM ---
       body: Stack(
         children: [
           // Background gradient
@@ -155,7 +161,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               height: 180,
               width: 180,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
+                color: Colors.white.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
             ),
@@ -190,7 +196,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         // Subtitle
                         Text(
                           Translations.getText(context, 'signup_subtitle'),
-                          style: textTheme.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.85)),
+                          style: textTheme.bodyMedium?.copyWith(color: Colors.white.withValues(alpha: 0.85)),
                         ),
                         const SizedBox(height: 24),
                         Card(
@@ -220,7 +226,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                                       ? Translations.getText(context, 'new_user')
                                                       : _nameController.text,
                                                   radius: 46,
-                                                  backgroundColor: scheme.surfaceVariant,
+                                                  backgroundColor: scheme.surfaceContainerHighest,
                                                   textColor: scheme.primary,
                                                   fontSize: 36,
                                                 ),

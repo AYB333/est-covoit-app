@@ -9,6 +9,7 @@ import '../services/profile_service.dart';
 import '../models/user_profile.dart';
 
 
+// --- SCREEN: MY PROFILE ---
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -17,6 +18,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  // --- CONTROLLERS + STATE ---
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
@@ -26,6 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    // --- INIT USER DATA ---
     final user = FirebaseAuth.instance.currentUser;
     _nameController = TextEditingController(
       text: user?.displayName ?? user?.email?.split('@').first ?? '',
@@ -35,7 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     _phoneController = TextEditingController(); // Init empty first
 
-    // Fetch Phone Number from Firestore (via repository)
+    // --- FETCH PHONE FROM FIRESTORE ---
     if (user != null) {
       UserRepository().fetchProfile(user.uid).then((profile) {
         final phone = profile?.phoneNumber;
@@ -56,6 +59,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  // --- SNACKBAR ---
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -67,6 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // --- PICK + UPLOAD PROFILE PHOTO ---
   Future<void> _pickAndUploadImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
@@ -79,12 +84,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final file = File(pickedFile.path);
       await ProfileService().updateProfilePhoto(file);
 
+      if (!mounted) return;
       if (mounted) {
         setState(() {});
         _showSnackBar(Translations.getText(context, 'profile_photo_updated'), Colors.green);
       }
     } catch (e) {
       // Check for specific firebase error
+      if (!mounted) return;
       String errorMsg = "${Translations.getText(context, 'upload_error_prefix')} $e";
       if (e.toString().contains("object-not-found")) {
         errorMsg = Translations.getText(context, 'upload_error_not_found');
@@ -97,6 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // --- SAVE NAME + PHONE ---
   Future<void> _saveName() async {
     final newName = _nameController.text.trim();
     if (newName.isEmpty) {
@@ -105,7 +113,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     setState(() => _isSaving = true);
-    setState(() => _isSaving = true);
     try {
       final phone = _phoneController.text.trim();
       await ProfileService().updateDisplayNameAndPhone(
@@ -113,15 +120,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         phoneNumber: phone,
       );
 
-      if (!context.mounted) return;
+      if (!mounted) return;
       _showSnackBar(Translations.getText(context, 'profile_updated'), Colors.green);
     } catch (e) {
+      if (!mounted) return;
       _showSnackBar("${Translations.getText(context, 'error_prefix')} ${e.toString()}", Colors.redAccent);
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
+  // --- CHANGE PASSWORD DIALOG ---
   void _showChangePasswordDialog() {
     final TextEditingController passwordController = TextEditingController();
     bool obscurePassword = true;
@@ -165,10 +174,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     }
                     try {
                       await FirebaseAuth.instance.currentUser?.updatePassword(newPassword);
-                      if (!context.mounted) return;
+                      if (!context.mounted || !mounted) return;
                       Navigator.pop(context);
                       _showSnackBar(Translations.getText(context, 'password_changed'), Colors.green);
                     } on FirebaseAuthException catch (e) {
+                      if (!context.mounted || !mounted) return;
                       if (e.code == 'requires-recent-login') {
                         _showSnackBar(Translations.getText(context, 'reauth_required'), Colors.redAccent);
                       } else if (e.code == 'weak-password') {
@@ -180,6 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         );
                       }
                     } catch (e) {
+                      if (!context.mounted || !mounted) return;
                       _showSnackBar("${Translations.getText(context, 'error_prefix')} ${e.toString()}", Colors.redAccent);
                     }
                   },
@@ -199,6 +210,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
+      // --- APPBAR ---
       appBar: AppBar(
         title: Text(Translations.getText(context, 'profile')),
         backgroundColor: Colors.transparent,
@@ -216,13 +228,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
+      // --- BODY: PROFILE FORM ---
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Avatar Section with Camera Badge
-            // Avatar Section with Camera Badge
+            // --- AVATAR + CAMERA BADGE ---
             Center(
               child: Stack(
                 children: [
@@ -230,7 +242,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                      userName: _nameController.text,
                      imageUrl: FirebaseAuth.instance.currentUser?.photoURL,
                      radius: 60,
-                     backgroundColor: scheme.primary.withOpacity(0.2),
+                     backgroundColor: scheme.primary.withValues(alpha: 0.2),
                      textColor: scheme.primary,
                      fontSize: 40,
                    ),
@@ -281,7 +293,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             const SizedBox(height: 30),
 
-            // Name Field
+            // --- NAME FIELD ---
             Text(
               Translations.getText(context, 'name_field'),
               style: textTheme.labelLarge,
@@ -295,7 +307,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Email Field (Read-only)
+            // --- EMAIL FIELD (READ-ONLY) ---
             Text(
               Translations.getText(context, 'email_field'),
               style: textTheme.labelLarge,
@@ -310,7 +322,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Phone Field
+            // --- PHONE FIELD ---
             Text(
               Translations.getText(context, 'phone_field'),
               style: const TextStyle(fontWeight: FontWeight.bold),
@@ -326,11 +338,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 30),
 
-            // Change Password Tile (Modern)
+            // --- CHANGE PASSWORD TILE ---
             Container(
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: scheme.primary.withOpacity(0.3),
+                  color: scheme.primary.withValues(alpha: 0.3),
                 ),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -355,7 +367,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 40),
 
-            // Save Button
+            // --- SAVE BUTTON ---
             SizedBox(
               width: double.infinity,
               height: 50,

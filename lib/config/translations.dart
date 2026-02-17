@@ -2,6 +2,7 @@
 import 'package:provider/provider.dart';
 import '../services/language_service.dart';
 
+// --- TRANSLATIONS: ALL STRINGS (FR/EN/AR/...) ---
 class Translations {
   static const Map<String, Map<String, String>> _translations = {
     'fr': {

@@ -9,6 +9,7 @@ import '../models/user_profile.dart';
 import '../repositories/user_repository.dart';
 import '../widgets/user_avatar.dart';
 
+// --- SCREEN: PUBLIC PROFILE ---
 class PublicProfileScreen extends StatefulWidget {
   final String userId;
   final String userName;
@@ -26,14 +27,17 @@ class PublicProfileScreen extends StatefulWidget {
 }
 
 class _PublicProfileScreenState extends State<PublicProfileScreen> {
+  // --- FUTURE: STATS DATA ---
   late final Future<_PublicProfileData> _profileDataFuture;
 
   @override
   void initState() {
     super.initState();
+    // --- LOAD STATS ---
     _profileDataFuture = _loadProfileData();
   }
 
+  // --- FETCH PROFILE STATS (RIDES / BOOKINGS / REVIEWS) ---
   Future<_PublicProfileData> _loadProfileData() async {
     final db = FirebaseFirestore.instance;
 
@@ -75,7 +79,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: scheme.background,
+      backgroundColor: scheme.surfaceContainerLowest,
+      // --- APPBAR ---
       appBar: AppBar(
         title: Text(Translations.getText(context, 'profile')),
         backgroundColor: Colors.transparent,
@@ -93,6 +98,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           ),
         ),
       ),
+      // --- BODY: STATS + REVIEWS ---
       body: FutureBuilder<_PublicProfileData>(
         future: _profileDataFuture,
         builder: (context, snapshot) {
@@ -119,6 +125,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 recentReviews: <Review>[],
               );
 
+          // --- STREAM: RATING ---
           return StreamBuilder<UserProfile?>(
             stream: UserRepository().streamProfile(widget.userId),
             builder: (context, userSnap) {
@@ -129,6 +136,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               return ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  // --- HEADER CARD ---
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -189,6 +197,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
+                  // --- STATS CARDS ---
                   Row(
                     children: [
                       Expanded(
@@ -209,6 +218,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     ],
                   ),
                   const SizedBox(height: 18),
+                  // --- SECTION: RECENT RIDES ---
                   _SectionCard(
                     title: Translations.getText(context, 'recent_rides'),
                     icon: Icons.route_rounded,
@@ -221,7 +231,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 decoration: BoxDecoration(
-                                  color: scheme.background.withValues(alpha: 0.35),
+                                  color: scheme.surfaceContainerLowest.withValues(alpha: 0.35),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: ListTile(
@@ -246,6 +256,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                           ),
                   ),
                   const SizedBox(height: 14),
+                  // --- SECTION: RECENT REVIEWS ---
                   _SectionCard(
                     title: Translations.getText(context, 'latest_reviews'),
                     icon: Icons.rate_review_outlined,
@@ -257,7 +268,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 decoration: BoxDecoration(
-                                  color: scheme.background.withValues(alpha: 0.35),
+                                  color: scheme.surfaceContainerLowest.withValues(alpha: 0.35),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: ListTile(
@@ -289,6 +300,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     );
   }
 
+  // --- EMPTY STATE TEXT ---
   Widget _buildEmptyText(BuildContext context, String text) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
@@ -301,6 +313,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   }
 }
 
+// --- UI: SECTION CARD ---
 class _SectionCard extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -344,6 +357,7 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
+// --- UI: STAT CARD ---
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
@@ -386,6 +400,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+// --- MODEL: PUBLIC PROFILE DATA ---
 class _PublicProfileData {
   final int ridesPublished;
   final int acceptedTripsAsDriver;

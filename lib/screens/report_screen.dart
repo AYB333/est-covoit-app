@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../config/translations.dart';
 import '../repositories/safety_repository.dart';
 
+// --- SCREEN: REPORT USER ---
 class ReportScreen extends StatefulWidget {
   final String reporterId;
   final String reportedUserId;
@@ -20,6 +21,7 @@ class ReportScreen extends StatefulWidget {
 }
 
 class _ReportScreenState extends State<ReportScreen> {
+  // --- REASONS LIST ---
   static const List<String> _reasons = <String>[
     'spam',
     'abuse',
@@ -27,6 +29,7 @@ class _ReportScreenState extends State<ReportScreen> {
     'other',
   ];
 
+  // --- STATE ---
   final TextEditingController _detailsController = TextEditingController();
   String _selectedReason = _reasons.first;
   bool _isSubmitting = false;
@@ -37,6 +40,7 @@ class _ReportScreenState extends State<ReportScreen> {
     super.dispose();
   }
 
+  // --- SUBMIT REPORT ---
   Future<void> _submit() async {
     if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
@@ -66,7 +70,8 @@ class _ReportScreenState extends State<ReportScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: scheme.background,
+      backgroundColor: scheme.surfaceContainerLowest,
+      // --- APPBAR ---
       appBar: AppBar(
         title: Text(Translations.getText(context, 'report_user')),
         backgroundColor: Colors.transparent,
@@ -84,6 +89,7 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
         ),
       ),
+      // --- BODY: FORM ---
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -110,7 +116,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   initialValue: _selectedReason,
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: scheme.background.withValues(alpha: 0.35),
+                    fillColor: scheme.surfaceContainerLowest.withValues(alpha: 0.35),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: scheme.outline.withValues(alpha: 0.5)),
@@ -147,7 +153,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   decoration: InputDecoration(
                     hintText: Translations.getText(context, 'report_details_hint'),
                     filled: true,
-                    fillColor: scheme.background.withValues(alpha: 0.35),
+                    fillColor: scheme.surfaceContainerLowest.withValues(alpha: 0.35),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: scheme.outline.withValues(alpha: 0.5)),
@@ -168,7 +174,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: scheme.primary,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: scheme.surfaceVariant,
+                    disabledBackgroundColor: scheme.surfaceContainerHighest,
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

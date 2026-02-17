@@ -12,6 +12,7 @@ import '../models/ride.dart';
 import '../repositories/ride_repository.dart';
 import '../config/translations.dart';
 
+// --- SCREEN: creation/edition dyal trajet (driver) ---
 class RideDetailsScreen extends StatefulWidget {
   final LatLng startLocation;
   final String? initialAddress;
@@ -31,9 +32,10 @@ class RideDetailsScreen extends StatefulWidget {
 }
 
 class _RideDetailsScreenState extends State<RideDetailsScreen> {
+  // --- CONTROLLER DYAL MAP ---
   final MapController _mapController = MapController();
   
-  // Variables State
+  // --- STATE: location + route + loading ---
   LatLng? _pickedLocation;
   String? _departureAddress;
   List<LatLng> _routePoints = [];
@@ -41,14 +43,15 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   bool _isLoadingPublish = false;
   bool _isLoadingLocation = false;
 
-  // Controllers
+  // --- CONTROLLERS: inputs text ---
   final TextEditingController _departureAddressController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   
+  // --- STATE: date + seats ---
   DateTime? _selectedDate;
   double _seats = 1;
 
-  // Vehicle type & pricing logic
+  // --- LOGIC: vehicle + price ---
   String _selectedVehicle = 'Voiture';
   double _routeDistanceKm = 0.0;
   double _minPrice = 0.0;
@@ -56,19 +59,20 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   double _price = 0.0;
   final double _priceStep = 0.5;
 
-  // Destination: EST Agadir
+  // --- CONST: destination (EST) ---
   static const LatLng _estAgadirLocation = LatLng(30.4070, -9.5790);
 
+  // --- MODE: edit / create ---
   bool get _isEditing => widget.rideId != null;
 
   @override
   void initState() {
     super.initState();
     
-    // Check if it's the default location from HomeScreen
+    // --- INIT: check default location ---
     bool isDefault = (widget.startLocation.latitude == 30.4000 && widget.startLocation.longitude == -9.6000);
 
-    // Initial setup
+    // --- INIT: edit mode wla new ride ---
     if (_isEditing && widget.rideData != null) {
       _pickedLocation = widget.startLocation;
       _loadRideData();
@@ -89,22 +93,23 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     }
   }
 
+  // --- LOAD DATA: edit mode ---
   void _loadRideData() {
     try {
       final data = widget.rideData!;
       
-      // 1. Basic Fields
+      // --- BASIC FIELDS ---
       _departureAddress = data['departureAddress'];
       _departureAddressController.text = _departureAddress ?? '';
       _selectedVehicle = data['vehicleType'] ?? 'Voiture';
       
-      // Safe casting for numbers
+      // --- SAFE CAST DYAL NUMBERS ---
       _price = (data['price'] as num?)?.toDouble() ?? 0.0;
       _seats = (data['seats'] as num?)?.toDouble() ?? 1.0;
       if (_seats < 1.0) _seats = 1.0; 
       if (_seats > 4.0) _seats = 4.0;
       
-      // 2. Date
+      // --- DATE ---
       if (data['date'] != null) {
         if (data['date'] is Timestamp) {
           _selectedDate = (data['date'] as Timestamp).toDate();
@@ -119,7 +124,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         }
       }
       
-      // 3. Location & Route
+      // --- LOCATION + ROUTE ---
       _fetchRoute(widget.startLocation);
     } catch (e) {
       debugPrint("Error loading ride data: $e");
@@ -147,9 +152,11 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     );
   }
 
+  // --- REVERSE GEOCODING: coords -> address ---
   Future<void> _geocodeLocation(LatLng location) async {
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(location.latitude, location.longitude);
+      if (!mounted) return;
       if (placemarks.isNotEmpty) {
         Placemark place = placemarks.first;
         final String address = [
@@ -167,6 +174,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     } catch (_) {}
   }
 
+  // --- FETCH ROUTE MEN OSRM ---
   Future<void> _fetchRoute(LatLng startPoint) async {
     setState(() {
       _isLoadingMap = true;
@@ -180,6 +188,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
 
     try {
       final response = await http.get(Uri.parse(osrmApiUrl));
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List<dynamic> coordinates = data['routes'][0]['geometry']['coordinates'];
@@ -190,12 +199,16 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         _updatePriceBounds();
       }
     } catch (e) {
+      if (!mounted) return;
       _showSnackBar(Translations.getText(context, 'map_connection_error'), Colors.redAccent);
     } finally {
-      setState(() => _isLoadingMap = false);
+      if (mounted) {
+        setState(() => _isLoadingMap = false);
+      }
     }
   }
 
+  // --- PRICE BOUNDS 3la 7sab distance + vehicle ---
   void _updatePriceBounds() {
     final bool isMoto = _selectedVehicle == 'Moto';
     final double rate = isMoto ? 0.5 : 1.0;
@@ -224,18 +237,21 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     });
   }
 
+  // --- MAP TAP: n9tar location w n7edd route ---
   void _handleMapTap(TapPosition tapPosition, LatLng latlng) {
     setState(() => _pickedLocation = latlng);
     _fetchRoute(latlng);
     _geocodeLocation(latlng);
   }
 
+  // --- GPS: jibi current location ---
   Future<void> _goToCurrentLocation() async {
     if (_isLoadingLocation) return;
     try {
       setState(() => _isLoadingLocation = true);
 
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!mounted) return;
       if (!serviceEnabled) {
         _showSnackBar(Translations.getText(context, 'gps_enable'), Colors.redAccent);
         await Geolocator.openLocationSettings();
@@ -243,8 +259,10 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
+      if (!mounted) return;
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
+        if (!mounted) return;
       }
 
       if (permission == LocationPermission.denied) {
@@ -261,11 +279,15 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
       Position? position;
       try {
         position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 10),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 10),
+          ),
         );
+        if (!mounted) return;
       } catch (_) {
         position = await Geolocator.getLastKnownPosition();
+        if (!mounted) return;
       }
 
       if (position == null) {
@@ -283,6 +305,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     }
   }
 
+  // --- PICK DATE + TIME ---
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -292,13 +315,14 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     );
     
     if (picked != null) {
-      // ignore: use_build_context_synchronously
+      if (!context.mounted) return;
       final TimeOfDay? pickedTime = await showTimePicker(
         context: context,
         initialTime: _selectedDate != null 
           ? TimeOfDay.fromDateTime(_selectedDate!)
           : TimeOfDay.now(),
       );
+      if (!context.mounted) return;
       
       if (pickedTime != null) {
         final DateTime fullDate = DateTime(
@@ -314,6 +338,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     }
   }
 
+  // --- BOTTOM SHEET: form dyal details ---
   void _showRideDetailsForm() {
     final scheme = Theme.of(context).colorScheme;
     showModalBottomSheet(
@@ -347,31 +372,41 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // 1. VEHICULE
+                    // --- 1) no3 l-vehicle ---
                     Text(
                       Translations.getText(context, 'vehicle_type'),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    Row(
-                      children: [
-                        Expanded(child: RadioListTile<String>(
-                          title: Text(Translations.getText(context, 'vehicle_car')),
-                          value: 'Voiture',
-                          groupValue: _selectedVehicle,
-                          activeColor: scheme.primary,
-                          onChanged: (val) => update(() { _selectedVehicle = val!; _updatePriceBounds(); })
-                        )),
-                        Expanded(child: RadioListTile<String>(
-                          title: Text(Translations.getText(context, 'vehicle_moto')),
-                          value: 'Moto',
-                          groupValue: _selectedVehicle,
-                          activeColor: scheme.primary,
-                          onChanged: (val) => update(() { _selectedVehicle = val!; _updatePriceBounds(); })
-                        )),
-                      ],
+                    RadioGroup<String>(
+                      groupValue: _selectedVehicle,
+                      onChanged: (value) {
+                        if (value == null) return;
+                        update(() {
+                          _selectedVehicle = value;
+                          _updatePriceBounds();
+                        });
+                      },
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: RadioListTile<String>(
+                              title: Text(Translations.getText(context, 'vehicle_car')),
+                              value: 'Voiture',
+                              activeColor: scheme.primary,
+                            ),
+                          ),
+                          Expanded(
+                            child: RadioListTile<String>(
+                              title: Text(Translations.getText(context, 'vehicle_moto')),
+                              value: 'Moto',
+                              activeColor: scheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
 
-                    // 2. PRIX
+                    // --- 2) thaman ---
                     Text(
                       Translations.getText(context, 'trip_price'),
                       style: const TextStyle(fontWeight: FontWeight.bold),
@@ -397,7 +432,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                     ),
                     const SizedBox(height: 15),
 
-                    // 4. DATE
+                    // --- 3) date + time ---
                     TextField(
                       controller: _dateController,
                       readOnly: true,
@@ -413,7 +448,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                     ),
                     const SizedBox(height: 15),
 
-                    // 5. SIEGES
+                    // --- 4) seats (car only) ---
                     if (_selectedVehicle == 'Voiture') ...[
                       Text(
                         "${Translations.getText(context, 'seats_count')}: ${_seats.toInt()}",
@@ -453,6 +488,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
     );
   }
 
+  // --- SAVE / UPDATE f Firestore ---
   Future<void> _publishRide() async {
     if (_selectedDate == null || _departureAddress == null) {
       _showSnackBar(Translations.getText(context, 'error_fill_fields'), Colors.redAccent);
@@ -485,12 +521,14 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
         final repo = RideRepository();
         if (_isEditing) {
            await repo.updateRide(widget.rideId!, ride);
+           if (!mounted) return;
            _showSnackBar(Translations.getText(context, 'trip_modified_success'), Colors.green);
         } else {
            await repo.createRide(ride);
+           if (!mounted) return;
            _showSnackBar(Translations.getText(context, 'trip_published_success'), Colors.green);
         }
-if (mounted) Navigator.pop(context); // Revenir au Dashboard
+if (mounted) Navigator.pop(context);
       }
     } catch (e) {
       _showSnackBar("${Translations.getText(context, 'error_prefix')} $e", Colors.redAccent);
@@ -503,6 +541,7 @@ if (mounted) Navigator.pop(context); // Revenir au Dashboard
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      // --- GPS FLOATING BUTTON ---
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 100.0),
         child: FloatingActionButton(
@@ -513,6 +552,7 @@ if (mounted) Navigator.pop(context); // Revenir au Dashboard
               : Icon(Icons.my_location, color: scheme.primary),
         ),
       ),
+      // --- APPBAR ---
       appBar: AppBar(
         title: Text(
           _isEditing
@@ -534,8 +574,10 @@ if (mounted) Navigator.pop(context); // Revenir au Dashboard
           ),
         ),
       ),
+      // --- BODY: map + confirm button ---
       body: Stack(
         children: [
+          // --- MAP VIEW ---
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -544,12 +586,15 @@ if (mounted) Navigator.pop(context); // Revenir au Dashboard
               onTap: _handleMapTap,
             ),
             children: [
+              // --- MAP TILES ---
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.est_covoit',
               ),
+              // --- ROUTE POLYLINE ---
               if (_routePoints.isNotEmpty)
                 PolylineLayer(polylines: [Polyline(points: _routePoints, color: scheme.primary, strokeWidth: 5.0)]),
+              // --- MARKERS ---
               MarkerLayer(markers: [
                 Marker(point: _estAgadirLocation, child: Icon(Icons.location_on, color: scheme.tertiary, size: 40)),
                 if (_pickedLocation != null)
@@ -557,8 +602,10 @@ if (mounted) Navigator.pop(context); // Revenir au Dashboard
               ]),
             ],
           ),
+          // --- LOADING OVERLAY ---
           if (_isLoadingMap) Center(child: CircularProgressIndicator(color: scheme.primary)),
           
+          // --- CONFIRM BUTTON (open form) ---
           if (_pickedLocation != null)
             Positioned(
               bottom: 20, left: 20, right: 20,

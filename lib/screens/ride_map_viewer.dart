@@ -10,6 +10,7 @@ import '../repositories/safety_repository.dart';
 import '../repositories/user_repository.dart';
 import 'public_profile_screen.dart';
 
+// --- SCREEN: MAP VIEW + BOOKING ---
 class RideMapViewer extends StatefulWidget {
   final List<LatLng> polylinePoints;
   final String driverName;
@@ -17,7 +18,7 @@ class RideMapViewer extends StatefulWidget {
   final String price;
   final DateTime date;
   
-  // New fields for reservation logic
+  // --- RESERVATION DATA ---
   final String? rideId;
   final Map<String, dynamic>? rideData;
 
@@ -37,14 +38,17 @@ class RideMapViewer extends StatefulWidget {
 }
 
 class _RideMapViewerState extends State<RideMapViewer> {
+  // --- CONST: DESTINATION ---
   static const LatLng _estAgadirLocation = LatLng(30.4070, -9.5790);
 
+  // --- SNACKBAR ---
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: color, behavior: SnackBarBehavior.floating),
     );
   }
 
+  // --- MESSAGE FROM BOOKING RESULT ---
   String _bookingMessage(BookingCreateResult result) {
     switch (result.status) {
       case BookingCreateStatus.success:
@@ -58,6 +62,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
     }
   }
 
+  // --- DRIVER RATING WIDGET ---
   Widget _buildDriverRating(String driverId) {
     final scheme = Theme.of(context).colorScheme;
     return StreamBuilder<UserProfile?>(
@@ -88,6 +93,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
     );
   }
 
+  // --- RESERVE RIDE FLOW ---
   Future<void> _reserveRide() async {
     if (widget.rideId == null || widget.rideData == null) {
       _showSnackBar(Translations.getText(context, 'error_trip_missing_data'), Colors.red);
@@ -106,6 +112,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
         blockerId: user.uid,
         blockedUserId: driverId,
       );
+      if (!mounted) return;
       if (blocked) {
         _showSnackBar(Translations.getText(context, 'blocked_action_unavailable'), Colors.red);
         return;
@@ -131,6 +138,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
       ),
     );
 
+    if (!mounted) return;
     if (confirm != true) return;
 
     final result = await BookingService.reserveRide(
@@ -139,7 +147,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
       rideData: widget.rideData!,
     );
 
-    if (!context.mounted) return;
+    if (!mounted) return;
     final scheme = Theme.of(context).colorScheme;
     final Color color = switch (result.status) {
       BookingCreateStatus.success => scheme.secondary,
@@ -157,13 +165,14 @@ class _RideMapViewerState extends State<RideMapViewer> {
       startPoint = widget.polylinePoints.first;
     }
 
-    // Check if current user is the driver
+    // --- CHECK: IS MY RIDE? ---
     final user = FirebaseAuth.instance.currentUser;
     final bool isMyRide = (user != null && widget.rideData != null && user.uid == widget.rideData!['driverId']);
     final int seats = (widget.rideData != null && widget.rideData!['seats'] is num) 
         ? (widget.rideData!['seats'] as num).toInt() 
         : 0;
 
+    // --- UI ---
     return Scaffold(
       appBar: AppBar(
         title: Text("${Translations.getText(context, 'ride_of')} ${widget.driverName}"),
@@ -341,7 +350,7 @@ class _RideMapViewerState extends State<RideMapViewer> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: seats > 0 ? scheme.primary : scheme.surfaceVariant,
+                          backgroundColor: seats > 0 ? scheme.primary : scheme.surfaceContainerHighest,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),

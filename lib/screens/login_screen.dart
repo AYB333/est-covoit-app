@@ -5,6 +5,7 @@ import 'package:est_covoit/screens/home_screen.dart';
 import '../config/translations.dart';
 import '../services/auth_service.dart';
 
+// --- SCREEN: LOGIN ---
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -13,6 +14,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  // --- CONTROLLERS + STATE ---
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
@@ -25,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  // --- LOGIN LOGIC ---
   Future<void> _login() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       _showError(Translations.getText(context, 'error_fill_fields'));
@@ -65,6 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // --- ERROR SNACKBAR ---
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -89,6 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
+      // --- BACKGROUND + FORM ---
       body: Stack(
         children: [
           Container(
@@ -107,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
               height: 160,
               width: 160,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.10),
+                color: Colors.white.withValues(alpha: 0.10),
                 shape: BoxShape.circle,
               ),
             ),
@@ -119,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
               height: 200,
               width: 200,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
+                color: Colors.white.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
             ),
@@ -138,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 18,
                             offset: const Offset(0, 10),
                           ),
@@ -151,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 6),
                     Text(
                       Translations.getText(context, 'app_tagline'),
-                      style: textTheme.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.85)),
+                      style: textTheme.bodyMedium?.copyWith(color: Colors.white.withValues(alpha: 0.85)),
                     ),
                     const SizedBox(height: 28),
                     Card(

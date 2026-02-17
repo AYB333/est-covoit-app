@@ -2,17 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/user_profile.dart';
 
+// --- REPO: USERS ---
 class UserRepository {
   final FirebaseFirestore _db;
 
   UserRepository({FirebaseFirestore? db}) : _db = db ?? FirebaseFirestore.instance;
 
+  // --- FETCH PROFILE ---
   Future<UserProfile?> fetchProfile(String uid) async {
     final doc = await _db.collection('users').doc(uid).get();
     if (!doc.exists) return null;
     return UserProfile.fromDoc(doc);
   }
 
+  // --- STREAM PROFILE ---
   Stream<UserProfile?> streamProfile(String uid) {
     return _db.collection('users').doc(uid).snapshots().map((doc) {
       if (!doc.exists) return null;
@@ -20,18 +23,21 @@ class UserRepository {
     });
   }
 
+  // --- SAVE PHONE ---
   Future<void> setPhoneNumber(String uid, String phoneNumber) async {
     await _db.collection('users').doc(uid).set({
       'phoneNumber': phoneNumber,
     }, SetOptions(merge: true));
   }
 
+  // --- SAVE FCM TOKEN ---
   Future<void> saveFcmToken(String uid, String token) async {
     await _db.collection('users').doc(uid).set({
       'fcmToken': token,
     }, SetOptions(merge: true));
   }
 
+  // --- FETCH PHONE ---
   Future<String?> fetchPhoneNumber(String uid) async {
     final doc = await _db.collection('users').doc(uid).get();
     if (!doc.exists) return null;
@@ -39,6 +45,7 @@ class UserRepository {
     return data?['phoneNumber']?.toString();
   }
 
+  // --- SYNC PHOTO TO RIDES + BOOKINGS ---
   Future<void> syncProfilePhoto(String uid, String photoUrl) async {
     final batch = _db.batch();
 

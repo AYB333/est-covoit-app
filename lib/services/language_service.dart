@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// --- SERVICE: LANGUAGE ---
 class LanguageService extends ChangeNotifier {
   String _currentLanguage = 'fr'; // Default to French
   late SharedPreferences _prefs;
@@ -9,10 +10,12 @@ class LanguageService extends ChangeNotifier {
   String get currentLanguage => _currentLanguage;
   bool get isInitialized => _isInitialized;
 
+  // --- INIT ---
   LanguageService() {
     _initLanguage();
   }
 
+  // --- LOAD SAVED LANGUAGE ---
   Future<void> _initLanguage() async {
     try {
       _prefs = await SharedPreferences.getInstance();
@@ -24,6 +27,7 @@ class LanguageService extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- SET LANGUAGE ---
   Future<void> setLanguage(String languageCode) async {
     if (_currentLanguage != languageCode) {
       _currentLanguage = languageCode;
@@ -36,6 +40,7 @@ class LanguageService extends ChangeNotifier {
     }
   }
 
+  // --- GET LOCALE ---
   Locale getLocale() {
     switch (_currentLanguage) {
       case 'en':

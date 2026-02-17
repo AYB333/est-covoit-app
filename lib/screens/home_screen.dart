@@ -9,6 +9,7 @@ import 'login_screen.dart';
 import 'settings_screen.dart';
 import '../services/auth_service.dart';
 
+// --- SCREEN: DASHBOARD (TABS + NAV) ---
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -17,17 +18,18 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  // --- STATE: TAB INDEX + ADDRESS ---
   int _currentIndex = 0;
   final TextEditingController _addressController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // Start listening for notifications for the current user
+    // --- START NOTIFICATIONS LISTENER ---
     NotificationService().startListening();
   }
 
-  // --- HELPER: Get User Name ---
+  // --- HELPER: USER NAME ---
   String _getUserName() {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null && user.displayName != null && user.displayName!.isNotEmpty) {
@@ -89,7 +91,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    // Liste des pages
+    // --- PAGES LIST ---
     final List<Widget> pages = [
       HomeTabView(
         userName: _getUserName(),
@@ -103,10 +105,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      // Body kay-tbeddel 3la 7ssab l-index
+      // --- BODY: TAB CONTENT ---
       body: pages[_currentIndex],
 
-      // Navigation Bar l-ta7t
+      // --- BOTTOM NAV ---
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {

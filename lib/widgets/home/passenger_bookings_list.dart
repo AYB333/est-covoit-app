@@ -22,7 +22,14 @@ class PassengerBookingsList extends StatefulWidget {
 }
 
 class _PassengerBookingsListState extends State<PassengerBookingsList> {
+  // --- STATE + CACHES ---
   final Set<String> _ratedBookingIds = <String>{};
+  final BookingRepository _bookingRepository = BookingRepository();
+  final RideRepository _rideRepository = RideRepository();
+  final ReviewRepository _reviewRepository = ReviewRepository();
+  final Map<String, Future<Ride?>> _rideFutureCache = <String, Future<Ride?>>{};
+  final Map<String, Future<bool>> _reviewFutureCache = <String, Future<bool>>{};
+  // --- FILTERS STATE ---
   DateTime? _filterDate;
   double? _filterMaxPrice;
   String _filterStatus = 'all';
@@ -33,6 +40,36 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
+  // --- CACHE HELPERS ---
+  Future<Ride?> _rideFuture(String rideId) {
+    return _rideFutureCache.putIfAbsent(
+      rideId,
+      () => _rideRepository.fetchRide(rideId),
+    );
+  }
+
+  Future<bool> _reviewExistsFuture({
+    required String bookingId,
+    required String reviewerId,
+  }) {
+    final key = '$bookingId|$reviewerId';
+    return _reviewFutureCache.putIfAbsent(
+      key,
+      () => _reviewRepository
+          .fetchReviewForBooking(bookingId: bookingId, reviewerId: reviewerId)
+          .then((review) => review != null),
+    );
+  }
+
+  void _pruneItemCaches(List<Booking> bookings, String reviewerId) {
+    final rideIds = bookings.map((booking) => booking.rideId).toSet();
+    _rideFutureCache.removeWhere((rideId, _) => !rideIds.contains(rideId));
+
+    final reviewKeys = bookings.map((booking) => '${booking.id}|$reviewerId').toSet();
+    _reviewFutureCache.removeWhere((key, _) => !reviewKeys.contains(key));
+  }
+
+  // --- OPEN FILTERS SHEET ---
   Future<void> _openFilters() async {
     final result = await showModalBottomSheet<_PassengerFiltersResult>(
       context: context,
@@ -60,15 +97,18 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final user = FirebaseAuth.instance.currentUser;
+    // --- AUTH GUARD ---
     if (user == null) {
       return Center(child: Text(Translations.getText(context, 'not_connected')));
     }
 
+    // --- STREAM: PASSENGER BOOKINGS ---
     return StreamBuilder<List<Booking>>(
-      stream: BookingRepository().streamPassengerBookings(user.uid),
+      stream: _bookingRepository.streamPassengerBookings(user.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
 
+        // --- ERROR STATE ---
         if (snapshot.hasError) {
           return Center(
             child: Padding(
@@ -82,6 +122,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
           );
         }
 
+        // --- EMPTY STATE ---
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return Center(
             child: Column(
@@ -95,16 +136,18 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
           );
         }
 
-        // Client-side sorting to avoid Index issues
-        final bookings = snapshot.data!;
+        // --- SORT + PRUNE CACHES ---
+        final bookings = List<Booking>.from(snapshot.data!);
         bookings.sort((a, b) {
           final tA = a.timestamp;
           final tB = b.timestamp;
-          if (tA == null) return -1; // Show new items first (optimistic UI)
+          if (tA == null) return -1;
           if (tB == null) return 1;
-          return tB.compareTo(tA); // Descending
+          return tB.compareTo(tA);
         });
+        _pruneItemCaches(bookings, user.uid);
 
+        // --- FILTER LOGIC ---
         final filteredBookings = bookings.where((booking) {
           final String status = booking.status.isEmpty ? 'pending' : booking.status;
           if (_filterStatus != 'all' && status != _filterStatus) {
@@ -124,6 +167,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
           return true;
         }).toList();
 
+        // --- FILTERED EMPTY STATE ---
         if (filteredBookings.isEmpty) {
           return Column(
             children: [
@@ -176,6 +220,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
           );
         }
 
+        // --- LIST: BOOKINGS ---
         return Column(
           children: [
             Padding(
@@ -242,7 +287,6 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                 break;
             }
 
-            // Format Date
             String dateStr = "";
             if (booking.rideDate != null) {
               try {
@@ -250,7 +294,6 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
               } catch (_) {}
             }
 
-            // Route
             String route = "${booking.departureAddress ?? Translations.getText(context, 'departure')} \u2192 ${booking.rideDestination.isEmpty ? 'EST' : booking.rideDestination}";
             if (route.length > 30) route = "${route.substring(0, 30)}...";
 
@@ -260,15 +303,15 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               child: Column(
                 children: [
+                  // --- CARD HEADER ---
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).highlightColor.withOpacity(0.1),
+                      color: Theme.of(context).highlightColor.withValues(alpha: 0.1),
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
                     ),
                     child: Row(
                       children: [
-                        // Dynamic Driver Avatar with Fallback
                         booking.driverPhotoUrl != null && booking.driverPhotoUrl!.isNotEmpty
                             ? GestureDetector(
                                 onTap: () => _openPublicProfile(
@@ -285,7 +328,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                                 ),
                               )
                             : FutureBuilder<Ride?>(
-                                future: RideRepository().fetchRide(booking.rideId),
+                                future: _rideFuture(booking.rideId),
                                 builder: (context, rideSnap) {
                                   String? fallbackUrl;
                                   if (rideSnap.hasData && rideSnap.data != null) {
@@ -342,9 +385,9 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.1),
+                                color: statusColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: statusColor.withOpacity(0.5)),
+                                border: Border.all(color: statusColor.withValues(alpha: 0.5)),
                               ),
                               child: Text(
                                 statusText,
@@ -357,7 +400,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                     ),
                   ),
 
-                  // Actions Section
+                  // --- ACTIONS ---
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Wrap(
@@ -388,12 +431,10 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
                           ),
                         if (status == 'accepted')
                           FutureBuilder<bool>(
-                            future: ReviewRepository()
-                                .fetchReviewForBooking(
-                                  bookingId: booking.id,
-                                  reviewerId: user.uid,
-                                )
-                                .then((review) => review != null),
+                            future: _reviewExistsFuture(
+                              bookingId: booking.id,
+                              reviewerId: user.uid,
+                            ),
                             builder: (context, snap) {
                               final bool rated =
                                   _ratedBookingIds.contains(booking.id) || (snap.data ?? false);
@@ -442,6 +483,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
     );
   }
 
+  // --- OPEN PUBLIC PROFILE ---
   void _openPublicProfile({
     required String userId,
     required String userName,
@@ -459,6 +501,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
     );
   }
 
+  // --- REVIEW FLOW ---
   Future<void> _showReviewDialog(Booking booking) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || !mounted) return;
@@ -478,6 +521,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
     if (result == 'submitted' || result == 'exists') {
       setState(() {
         _ratedBookingIds.add(booking.id);
+        _reviewFutureCache['${booking.id}|${user.uid}'] = Future<bool>.value(true);
       });
     }
 
@@ -495,9 +539,14 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
     );
   }
 
+  // --- DELETE / CANCEL BOOKING ---
   void _deleteBooking(String bookingId, bool isAccepted) async {
     final scheme = Theme.of(context).colorScheme;
-    // Confirmation Dialog
+    final passengerLabel = Translations.getText(context, 'passenger');
+    final cancelTitle = Translations.getText(context, 'booking_cancel_title');
+    final cancelBody = Translations.getText(context, 'booking_cancel_body');
+    final bookingDeletedText = Translations.getText(context, 'booking_deleted');
+    final errorPrefix = Translations.getText(context, 'error_prefix');
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -523,47 +572,50 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
       ),
     );
 
+    if (!mounted) return;
     if (confirm != true) return;
 
     try {
-      final bookingRepo = BookingRepository();
-      final booking = await bookingRepo.fetchBooking(bookingId);
+      final booking = await _bookingRepository.fetchBooking(bookingId);
       if (booking == null) return;
 
       final String rideId = booking.rideId;
       final String driverId = booking.driverId;
-      final String passengerName = booking.passengerName.isEmpty
-          ? Translations.getText(context, 'passenger')
-          : booking.passengerName;
+      final String passengerName = booking.passengerName.isEmpty ? passengerLabel : booking.passengerName;
       final String status = booking.status.isEmpty ? 'pending' : booking.status;
       final bool wasAccepted = status == 'accepted';
 
       if (wasAccepted) {
-        await bookingRepo.deleteBookingAndRestoreSeat(
+        await _bookingRepository.deleteBookingAndRestoreSeat(
           bookingId: bookingId,
           rideId: rideId,
         );
 
-        // Notify Driver
         NotificationService.sendNotification(
           receiverId: driverId,
-          title: Translations.getText(context, 'booking_cancel_title'),
-          body: "$passengerName ${Translations.getText(context, 'booking_cancel_body')}",
+          title: cancelTitle,
+          body: "$passengerName $cancelBody",
           type: "booking_cancel",
         );
       } else {
-        await bookingRepo.deleteBooking(bookingId);
+        await _bookingRepository.deleteBooking(bookingId);
       }
+
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      if (currentUserId != null) {
+        _reviewFutureCache.remove('$bookingId|$currentUserId');
+      }
+      _rideFutureCache.remove(booking.rideId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(Translations.getText(context, 'booking_deleted'))),
+          SnackBar(content: Text(bookingDeletedText)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("${Translations.getText(context, 'error_prefix')} $e")),
+          SnackBar(content: Text("$errorPrefix $e")),
         );
       }
     }
@@ -571,6 +623,7 @@ class _PassengerBookingsListState extends State<PassengerBookingsList> {
 }
 
 
+// --- FILTERS RESULT MODEL ---
 class _PassengerFiltersResult {
   final DateTime? date;
   final double? maxPrice;
@@ -583,6 +636,7 @@ class _PassengerFiltersResult {
   });
 }
 
+// --- FILTERS SHEET (UI) ---
 class _PassengerFiltersSheet extends StatefulWidget {
   final DateTime? initialDate;
   final double? initialMaxPrice;
@@ -598,6 +652,7 @@ class _PassengerFiltersSheet extends StatefulWidget {
   State<_PassengerFiltersSheet> createState() => _PassengerFiltersSheetState();
 }
 
+// --- FILTERS SHEET STATE ---
 class _PassengerFiltersSheetState extends State<_PassengerFiltersSheet> {
   late final TextEditingController _maxPriceController;
   DateTime? _selectedDate;

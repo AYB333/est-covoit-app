@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:latlong2/latlong.dart';
 
+// --- MODEL: RIDE ---
 class Ride {
   final String id;
   final String driverId;
@@ -36,11 +37,13 @@ class Ride {
     required this.routeDistanceKm,
   });
 
+  // --- FROM FIRESTORE DOC ---
   factory Ride.fromDoc(DocumentSnapshot doc) {
     final data = (doc.data() as Map<String, dynamic>?) ?? {};
     return Ride.fromMap(data, id: doc.id);
   }
 
+  // --- FROM MAP ---
   factory Ride.fromMap(Map<String, dynamic> data, {String id = ''}) {
     final Timestamp? ts = data['date'] as Timestamp?;
     final List<dynamic> rawPoints = (data['polylinePoints'] as List<dynamic>?) ?? [];
@@ -71,6 +74,7 @@ class Ride {
     );
   }
 
+  // --- TO MAP ---
   Map<String, dynamic> toMap() {
     return {
       'driverId': driverId,

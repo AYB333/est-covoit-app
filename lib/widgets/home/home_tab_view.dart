@@ -23,6 +23,7 @@ class HomeTabView extends StatelessWidget {
     required this.onLogout,
   });
 
+  // --- STREAMS: COUNTERS ---
   Stream<int> _availableRidesCountStream() {
     return FirebaseFirestore.instance
         .collection('rides')
@@ -60,6 +61,7 @@ class HomeTabView extends StatelessWidget {
 
     return Column(
       children: [
+        // --- HEADER ---
         HomeHeader(
           userName: userName,
           photoUrl: photoUrl,
@@ -71,6 +73,7 @@ class HomeTabView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // --- STATS TITLE ---
                 Text(
                   Translations.getText(context, 'home_stats'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -79,6 +82,7 @@ class HomeTabView extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 10),
+                // --- STATS ROW ---
                 Row(
                   children: [
                     Expanded(
@@ -114,6 +118,7 @@ class HomeTabView extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
+                // --- DRIVER CARD ---
                 Expanded(
                   child: HomeRoleCard(
                     title: Translations.getText(context, 'driver_card'),
@@ -134,6 +139,7 @@ class HomeTabView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
+                // --- PASSENGER CARD ---
                 Expanded(
                   child: HomeRoleCard(
                     title: Translations.getText(context, 'passenger_card'),
@@ -176,6 +182,7 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    // --- STAT TILE UI ---
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(

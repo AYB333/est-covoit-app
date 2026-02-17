@@ -22,6 +22,7 @@ class HomeHeader extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    // --- HEADER CONTAINER ---
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -38,6 +39,7 @@ class HomeHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // --- LEFT: AVATAR + SALAM + NAME ---
           Row(
             children: [
               GestureDetector(
@@ -72,9 +74,10 @@ class HomeHeader extends StatelessWidget {
               ),
             ],
           ),
+          // --- RIGHT: LOGOUT ---
           Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(14),
             ),
             child: IconButton(

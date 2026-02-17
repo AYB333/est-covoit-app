@@ -23,6 +23,7 @@ class DriverRidesList extends StatefulWidget {
 }
 
 class _DriverRidesListState extends State<DriverRidesList> {
+  // --- FILTERS STATE ---
   DateTime? _filterDate;
   double? _filterMaxPrice;
   int _filterMinSeats = 0;
@@ -33,6 +34,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
+  // --- OPEN FILTERS SHEET ---
   Future<void> _openFilters() async {
     final result = await showModalBottomSheet<_DriverFiltersResult>(
       context: context,
@@ -60,14 +62,17 @@ class _DriverRidesListState extends State<DriverRidesList> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final user = FirebaseAuth.instance.currentUser;
+    // --- AUTH GUARD ---
     if (user == null) {
       return Center(child: Text(Translations.getText(context, 'not_connected')));
     }
 
+    // --- STREAM: DRIVER RIDES ---
     return StreamBuilder<List<Ride>>(
       stream: RideRepository().streamDriverRides(user.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        // --- EMPTY STATE ---
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return Center(
             child: Column(
@@ -81,6 +86,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
           );
         }
 
+        // --- FILTER LOGIC ---
         final rides = snapshot.data!;
         final filteredRides = rides.where((ride) {
           if (_filterDate != null && !_isSameDay(ride.date, _filterDate!)) {
@@ -95,6 +101,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
           return true;
         }).toList();
 
+        // --- FILTERED EMPTY STATE ---
         if (filteredRides.isEmpty) {
           return Column(
             children: [
@@ -147,6 +154,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
           );
         }
 
+        // --- LIST: RIDES ---
         return Column(
           children: [
             Padding(
@@ -221,7 +229,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
                               userName: user.displayName ?? 'Moi',
                               imageUrl: user.photoURL,
                               radius: 20,
-                              backgroundColor: scheme.primary.withOpacity(0.12),
+                              backgroundColor: scheme.primary.withValues(alpha: 0.12),
                               textColor: scheme.primary,
                             ),
                           ),
@@ -231,6 +239,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
                           ),
                         ),
                         const Divider(height: 1),
+                        // --- ACTIONS (EDIT / DELETE / REQUESTS) ---
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                           child: Wrap(
@@ -319,8 +328,13 @@ class _DriverRidesListState extends State<DriverRidesList> {
     );
   }
 
+  // --- DELETE RIDE FLOW ---
   void _deleteRide(String rideId) async {
     final scheme = Theme.of(context).colorScheme;
+    final cancelTitle = Translations.getText(context, 'ride_canceled_title');
+    final cancelBody = Translations.getText(context, 'ride_canceled_body');
+    final rideDeletedText = Translations.getText(context, 'ride_deleted');
+    final errorPrefix = Translations.getText(context, 'error_prefix');
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -336,21 +350,20 @@ class _DriverRidesListState extends State<DriverRidesList> {
       ),
     );
 
+    if (!mounted) return;
     if (confirm != true) return;
 
     try {
       final bookingRepo = BookingRepository();
       final rideRepo = RideRepository();
 
-      // Get all bookings for this ride
       final bookings = await bookingRepo.fetchBookingsForRide(rideId);
       for (var booking in bookings) {
-        // Notify Passenger if booking was pending or accepted
         if (booking.status == 'pending' || booking.status == 'accepted') {
           NotificationService.sendNotification(
             receiverId: booking.passengerId,
-            title: Translations.getText(context, 'ride_canceled_title'),
-            body: "${Translations.getText(context, 'ride_canceled_body')} ${booking.departureAddress ?? ''}".trim(),
+            title: cancelTitle,
+            body: "$cancelBody ${booking.departureAddress ?? ''}".trim(),
             type: "ride_cancel",
           );
         }
@@ -359,18 +372,18 @@ class _DriverRidesListState extends State<DriverRidesList> {
       await rideRepo.deleteRideAndBookings(rideId);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Translations.getText(context, 'ride_deleted'))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(rideDeletedText)));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("${Translations.getText(context, 'error_prefix')} $e")),
+          SnackBar(content: Text("$errorPrefix $e")),
         );
       }
     }
   }
 
-  // --- LOGIC: Driver Requests Modal ---
+  // --- MODAL: REQUESTS LIST ---
   void _showRequestsModal(BuildContext context, String rideId) {
     final scheme = Theme.of(context).colorScheme;
     showModalBottomSheet(
@@ -399,13 +412,11 @@ class _DriverRidesListState extends State<DriverRidesList> {
                       return Center(child: Text(Translations.getText(context, 'no_requests')));
                     }
 
-                    // Client-side Sort: Pending first, then Accepted, then Rejected
                     final requests = snapshot.data!;
                     requests.sort((a, b) {
                       final sa = a.status.isEmpty ? 'pending' : a.status;
                       final sb = b.status.isEmpty ? 'pending' : b.status;
 
-                      // Custom order: pending < accepted < rejected
                       int order(String s) {
                         if (s == 'pending') return 0;
                         if (s == 'accepted') return 1;
@@ -525,24 +536,28 @@ class _DriverRidesListState extends State<DriverRidesList> {
     );
   }
 
+  // --- HANDLE BOOKING (ACCEPT / REJECT) ---
   Future<void> _handleBooking(String bookingId, String rideId, bool accept, String passengerId) async {
     if (accept) {
       try {
+        final acceptedTitle = Translations.getText(context, 'booking_accepted_title');
+        final acceptedBody = Translations.getText(context, 'booking_accepted_body');
         await BookingRepository().acceptBookingWithSeatUpdate(
           bookingId: bookingId,
           rideId: rideId,
         );
+        if (!mounted) return;
 
-        // Notify Passenger
         NotificationService.sendNotification(
           receiverId: passengerId,
-          title: Translations.getText(context, 'booking_accepted_title'),
-          body: Translations.getText(context, 'booking_accepted_body'),
+          title: acceptedTitle,
+          body: acceptedBody,
           type: "booking_status",
         );
 
-        if (mounted) Navigator.pop(context); // Close modal to refresh seats
+        if (mounted) Navigator.pop(context);
       } catch (e) {
+        if (!mounted) return;
         String message = "${Translations.getText(context, 'error_prefix')} $e";
         if (e is StateError) {
           switch (e.message) {
@@ -565,8 +580,11 @@ class _DriverRidesListState extends State<DriverRidesList> {
       }
     } else {
       try {
+        final rejectedTitle = Translations.getText(context, 'booking_rejected_title');
+        final rejectedBody = Translations.getText(context, 'booking_rejected_body');
         final bookingRepo = BookingRepository();
         final booking = await bookingRepo.fetchBooking(bookingId);
+        if (!mounted) return;
         if (booking == null) return;
 
         final status = booking.status.isEmpty ? 'pending' : booking.status;
@@ -580,15 +598,16 @@ class _DriverRidesListState extends State<DriverRidesList> {
         }
 
         await bookingRepo.rejectBooking(bookingId);
+        if (!mounted) return;
 
-        // Notify Passenger
         NotificationService.sendNotification(
           receiverId: passengerId,
-          title: Translations.getText(context, 'booking_rejected_title'),
-          body: Translations.getText(context, 'booking_rejected_body'),
+          title: rejectedTitle,
+          body: rejectedBody,
           type: "booking_status",
         );
       } catch (e) {
+        if (!mounted) return;
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("${Translations.getText(context, 'error_prefix')} $e")),
@@ -599,6 +618,7 @@ class _DriverRidesListState extends State<DriverRidesList> {
   }
 }
 
+// --- FILTERS RESULT MODEL ---
 class _DriverFiltersResult {
   final DateTime? date;
   final double? maxPrice;
@@ -611,6 +631,7 @@ class _DriverFiltersResult {
   });
 }
 
+// --- FILTERS SHEET (UI) ---
 class _DriverFiltersSheet extends StatefulWidget {
   final DateTime? initialDate;
   final double? initialMaxPrice;
@@ -626,6 +647,7 @@ class _DriverFiltersSheet extends StatefulWidget {
   State<_DriverFiltersSheet> createState() => _DriverFiltersSheetState();
 }
 
+// --- FILTERS SHEET STATE ---
 class _DriverFiltersSheetState extends State<_DriverFiltersSheet> {
   late final TextEditingController _maxPriceController;
   DateTime? _selectedDate;

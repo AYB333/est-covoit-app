@@ -9,6 +9,7 @@ import 'find_ride_screen.dart';
 import '../config/translations.dart';
 
 class AddRideScreen extends StatefulWidget {
+  // --- MODE: DRIVER / PASSENGER ---
   final bool isDriver;
 
   const AddRideScreen({super.key, this.isDriver = true});
@@ -18,15 +19,18 @@ class AddRideScreen extends StatefulWidget {
 }
 
 class _AddRideScreenState extends State<AddRideScreen> {
+  // --- CONSTANTS (EST + ZOOM) ---
   static const LatLng _estAgadirLocation = LatLng(30.4061, -9.5790);
   static const double _defaultZoom = 12.0;
   
+  // --- STATE: MAP + ROUTE ---
   LatLng _selectedLocation = _estAgadirLocation;
   final MapController _mapController = MapController();
   bool _isLoadingLocation = false;
   List<LatLng> _routePoints = [];
   bool _isLoadingRoute = false;
 
+  // --- GET CURRENT GPS LOCATION ---
   Future<void> _getCurrentLocation() async {
     if (_isLoadingLocation) return;
     setState(() => _isLoadingLocation = true);
@@ -35,18 +39,22 @@ class _AddRideScreenState extends State<AddRideScreen> {
     LocationPermission permission;
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!mounted) return;
     if (!serviceEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(Translations.getText(context, 'gps_enable'))),
       );
       await Geolocator.openLocationSettings();
+      if (!mounted) return;
       setState(() => _isLoadingLocation = false);
       return;
     }
 
     permission = await Geolocator.checkPermission();
+    if (!mounted) return;
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
+      if (!mounted) return;
       if (permission == LocationPermission.denied) {
         setState(() => _isLoadingLocation = false);
         return;
@@ -55,6 +63,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
 
     if (permission == LocationPermission.deniedForever) {
       await Geolocator.openAppSettings();
+      if (!mounted) return;
       setState(() => _isLoadingLocation = false);
       return;
     }
@@ -63,11 +72,15 @@ class _AddRideScreenState extends State<AddRideScreen> {
       Position? position;
       try {
         position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 10),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 10),
+          ),
         );
+        if (!mounted) return;
       } catch (_) {
         position = await Geolocator.getLastKnownPosition();
+        if (!mounted) return;
       }
 
       if (position == null) {
@@ -92,6 +105,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
     }
   }
 
+  // --- FETCH ROUTE FROM OSRM ---
   Future<void> _fetchRoute(LatLng startPoint) async {
     setState(() {
       _isLoadingRoute = true;
@@ -105,6 +119,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
 
     try {
       final response = await http.get(Uri.parse(osrmApiUrl)).timeout(const Duration(seconds: 12));
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -115,21 +130,26 @@ class _AddRideScreenState extends State<AddRideScreen> {
               .toList();
         });
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("${Translations.getText(context, 'routing_error')} ${response.statusCode}")),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("${Translations.getText(context, 'osrm_connection_error')} $e")),
       );
     } finally {
-      setState(() {
-        _isLoadingRoute = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingRoute = false;
+        });
+      }
     }
   }
 
+  // --- MAP TAP HANDLER ---
   void _handleMapTap(TapPosition tapPosition, LatLng latlng) {
     setState(() {
       _selectedLocation = latlng;
@@ -137,6 +157,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
     _fetchRoute(latlng);
   }
 
+  // --- BUTTON: NEXT STEP (DRIVER OR PASSENGER) ---
   void _handleButtonPress() {
     if (widget.isDriver) {
       Navigator.push(
@@ -157,6 +178,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- UI LABELS DEPENDING ON MODE ---
     final String appBarTitle = widget.isDriver
         ? Translations.getText(context, 'departure_point')
         : Translations.getText(context, 'trip_to_est');
@@ -167,6 +189,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
     final Color buttonColor = widget.isDriver ? scheme.primary : scheme.secondary;
 
     return Scaffold(
+      // --- APPBAR ---
       appBar: AppBar(
         title: Text(appBarTitle),
         backgroundColor: Colors.transparent,
@@ -184,8 +207,10 @@ class _AddRideScreenState extends State<AddRideScreen> {
           ),
         ),
       ),
+      // --- BODY: MAP + FLOATING BUTTONS ---
       body: Stack(
         children: [
+          // --- MAP VIEW ---
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -197,11 +222,12 @@ class _AddRideScreenState extends State<AddRideScreen> {
               onTap: _handleMapTap,
             ),
             children: [
+              // --- MAP TILES ---
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.est_covoit',
               ),
-              // Polyline route from selected location to EST Agadir
+              // --- ROUTE POLYLINE ---
               if (_routePoints.isNotEmpty)
                 PolylineLayer(
                   polylines: [
@@ -212,10 +238,10 @@ class _AddRideScreenState extends State<AddRideScreen> {
                     ),
                   ],
                 ),
-              // Markers layer
+              // --- MARKERS LAYER ---
               MarkerLayer(
                 markers: [
-                  // EST Agadir destination marker (fixed)
+                  // --- EST MARKER (FIXED) ---
                   Marker(
                     point: _estAgadirLocation,
                     width: 80,
@@ -229,7 +255,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: scheme.tertiary.withOpacity(0.8),
+                              color: scheme.tertiary.withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(5),
                             ),
                             child: const Text(
@@ -241,7 +267,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
                       ],
                     ),
                   ),
-                  // Green marker for selected departure point
+                  // --- DEPARTURE MARKER ---
                   if (_selectedLocation != _estAgadirLocation)
                     Marker(
                       point: _selectedLocation,
@@ -256,7 +282,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: scheme.secondary.withOpacity(0.8),
+                                color: scheme.secondary.withValues(alpha: 0.8),
                                 borderRadius: BorderRadius.circular(5),
                               ),
                             child: Text(
@@ -273,7 +299,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
             ],
           ),
 
-          // GPS button
+          // --- GPS BUTTON ---
           Positioned(
             bottom: 100,
             right: 20,
@@ -286,7 +312,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
             ),
           ),
 
-          // Action button
+          // --- ACTION BUTTON ---
           Positioned(
             bottom: 30,
             left: 20,

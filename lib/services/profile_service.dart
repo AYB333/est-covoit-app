@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 
 import '../repositories/user_repository.dart';
 
+// --- SERVICE: PROFILE ---
 class ProfileService {
   final FirebaseAuth _auth;
   final FirebaseStorage _storage;
@@ -18,6 +19,7 @@ class ProfileService {
         _storage = storage ?? FirebaseStorage.instance,
         _users = users ?? UserRepository();
 
+  // --- UPDATE NAME + PHONE ---
   Future<void> updateDisplayNameAndPhone({
     required String name,
     required String phoneNumber,
@@ -30,6 +32,7 @@ class ProfileService {
     await _users.setPhoneNumber(user.uid, phoneNumber);
   }
 
+  // --- UPDATE PROFILE PHOTO ---
   Future<void> updateProfilePhoto(File file) async {
     final user = _auth.currentUser;
     if (user == null) return;

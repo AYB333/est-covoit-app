@@ -2,13 +2,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/review.dart';
 
+// --- REPO: REVIEWS ---
 class ReviewRepository {
   final FirebaseFirestore _db;
 
   ReviewRepository({FirebaseFirestore? db}) : _db = db ?? FirebaseFirestore.instance;
 
+  // --- HELPER: DOC ID ---
   String _reviewDocId(String bookingId, String reviewerId) => '${bookingId}_$reviewerId';
 
+  // --- FETCH: REVIEW FOR BOOKING ---
   Future<Review?> fetchReviewForBooking({
     required String bookingId,
     required String reviewerId,
@@ -18,6 +21,7 @@ class ReviewRepository {
     return Review.fromDoc(doc);
   }
 
+  // --- SUBMIT REVIEW + UPDATE USER RATING ---
   Future<void> submitReview({
     required String bookingId,
     required String rideId,
